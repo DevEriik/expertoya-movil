@@ -22,6 +22,14 @@ export default function RootLayout() {
             headerShown: false,
           }}
         />
+        <Stack.Screen
+          name="edit-profile"
+          options={{
+            title: "Editar Perfil",
+            headerShown: false,
+          }}
+        />
+
       </Stack>
     </ThemeProvider>
   );
