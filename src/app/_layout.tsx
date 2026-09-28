@@ -13,6 +13,15 @@ export default function RootLayout() {
       <AnimatedSplashOverlay />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
+        <Stack.Screen
+          name="create-service"
+          options={{
+            presentation: "transparentModal",
+            title: "Crear Servicio",
+            headerShown: false,
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );
