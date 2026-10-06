@@ -1,7 +1,6 @@
 import { useReducer, useMemo } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-
 import type {
     OnboardingState,
     DocumentSlot,

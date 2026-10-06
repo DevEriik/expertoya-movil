@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useFocusEffect } from "expo-router";
 
 import {
     ActivityIndicator,
@@ -19,9 +20,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { getToken } from '../utils/secureStore';
 
 import { Colors } from "@/constants/theme";
 import Constants from "expo-constants";
+import { useAuth } from "@/context/AuthContext";
 
 const ZONAS_SUGERIDAS = ["Neuquén", "Cipolletti", "Plottier", "Fernandez Oro", "Allen", "Cutral Co", "Zapala", "General Roca", "Centenario", "Villa Regina"];
 
@@ -41,6 +44,7 @@ export default function EditProfileScreen() {
     const insets = useSafeAreaInsets();
     const scheme = useColorScheme();
     const colors = Colors[scheme === "unspecified" ? "light" : scheme];
+    const { user, login } = useAuth();
 
     const [isSaving, setIsSaving] = useState(false);
 
@@ -75,10 +79,15 @@ export default function EditProfileScreen() {
                 process.env.EXPO_PUBLIC_API_URL ||
                 (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
 
-            const response = await fetch(`${API_URL}/api/professionals/profile`, {
+            const token = await getToken("auth_token");
+
+            const endpoint = user?.rol === 'CLIENTE' ? '/api/auth/profile' : '/api/professionals/profile';
+
+            const response = await fetch(`${API_URL}${endpoint}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify(payload),
             });
@@ -90,18 +99,19 @@ export default function EditProfileScreen() {
                     [{ text: "Aceptar", onPress: () => router.back() }]
                 );
             } else {
+                const errorData = await response.json().catch(() => ({}));
                 Alert.alert(
-                    "Cambios guardados",
-                    "Los datos de tu perfil se actualizaron correctamente.",
-                    [{ text: "Aceptar", onPress: () => router.back() }]
+                    "Error al actualizar",
+                    errorData.error || "Hubo un problema al guardar los datos en el servidor.",
+                    [{ text: "Aceptar" }]
                 );
             }
         } catch (error) {
-            console.warn("Aviso de conexión:", error);
+            console.warn("Error de conexión:", error);
             Alert.alert(
-                "Cambios guardados",
-                "Los cambios fueron procesados en tu perfil.",
-                [{ text: "Aceptar", onPress: () => router.back() }]
+                "Error de red",
+                "No se pudo conectar con el servidor. Verifica tu conexión a internet.",
+                [{ text: "Aceptar" }]
             );
         } finally {
             setIsSaving(false);
@@ -121,11 +131,62 @@ export default function EditProfileScreen() {
     };
 
 
-    const [nombre, setNombre] = useState("Carlos");
-    const [apellido, setApellido] = useState("Gómez");
-    const [telefono, setTelefono] = useState("+54 11 4567-8900");
-    const [bio, setBio] = useState(
-        "Especialista en instalaciones eléctricas residenciales y comerciales con más de 8 años de experiencia. Matriculado y enfocado en trabajos seguros y garantizados."
+    const [nombre, setNombre] = useState(user?.nombre || "");
+    const [apellido, setApellido] = useState(user?.apellido || "");
+    const [telefono, setTelefono] = useState("");
+    const [bio, setBio] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+
+    useFocusEffect(
+        useCallback(() => {
+            const fetchProfile = async () => {
+                setIsLoading(true);
+                try {
+                    const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
+                    const API_URL =
+                        process.env.EXPO_PUBLIC_API_URL ||
+                        (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
+
+                    const token = await getToken("auth_token");
+                    
+                    if (user?.rol === 'PROFESIONAL' || user?.rol === 'ADMIN') {
+                        const response = await fetch(`${API_URL}/api/professionals/profile`, {
+                            headers: {
+                                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            setNombre(data.nombre || "");
+                            setApellido(data.apellido || "");
+                            setTelefono(data.telefono || "");
+                            setBio(data.descripcion_perfil || "");
+                            setZonasCobertura(data.ubicacion_geografica || "");
+                            if (data.foto_perfil) setAvatarUri(data.foto_perfil);
+                        }
+                    } else {
+                        const response = await fetch(`${API_URL}/api/auth/me`, {
+                            headers: {
+                                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                            }
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            setNombre(data.usuarioAutenticado.nombre || "");
+                            setApellido(data.usuarioAutenticado.apellido || "");
+                            setTelefono(data.usuarioAutenticado.telefono || "");
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error cargando el perfil", error);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            fetchProfile();
+        }, [user])
     );
 
     const [selectedOficios, setSelectedOficios] = useState<number[]>([1]);
@@ -203,7 +264,13 @@ export default function EditProfileScreen() {
                 ]}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={styles.avatarSection}>
+                {isLoading ? (
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 }}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                    </View>
+                ) : (
+                    <>
+                        <View style={styles.avatarSection}>
                     <View style={styles.avatarWrapper}>
                         <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
                         <TouchableOpacity
@@ -283,11 +350,30 @@ export default function EditProfileScreen() {
                         />
                     </View>
 
-                    <View style={styles.inputGroup}>
-                        <View style={styles.labelRow}>
-                            <Text style={[styles.label, { color: colors.text }]}>
-                                Biografía Profesional
+                    </View>
+
+                    {user?.rol === 'CLIENTE' && (
+                        <View style={[styles.inputGroup, { marginTop: 24, padding: 16, backgroundColor: colors.backgroundSelected, borderRadius: 12 }]}>
+                            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 8 }]}>¿Eres Profesional?</Text>
+                            <Text style={[styles.sectionSubtitle, { color: colors.textSecondary, marginBottom: 16 }]}>
+                                Actualmente tienes una cuenta de cliente. Para ofrecer tus servicios y configurar tu perfil profesional (oficios, zonas, biografía), debes completar el proceso de acreditación.
                             </Text>
+                            <TouchableOpacity 
+                                style={{ backgroundColor: colors.primary, width: '100%', borderRadius: 8, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' }}
+                                onPress={() => router.push('/onboarding')}
+                            >
+                                <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 16 }}>Acreditarme como Profesional</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {user?.rol !== 'CLIENTE' && (
+                        <>
+                            <View style={styles.inputGroup}>
+                                <View style={styles.labelRow}>
+                                    <Text style={[styles.label, { color: colors.text }]}>
+                                        Biografía Profesional
+                                    </Text>
                             <Text style={[styles.charCount, { color: colors.textSecondary }]}>
                                 {bio.length}/300
                             </Text>
@@ -311,7 +397,6 @@ export default function EditProfileScreen() {
                             onChangeText={setBio}
                         />
                     </View>
-                </View>
 
                 {/* Sección 2: Mis Oficios y Especialidades */}
                 <View style={styles.sectionContainer}>
@@ -424,6 +509,8 @@ export default function EditProfileScreen() {
                         ))}
                     </View>
                 </View>
+                </>
+                )}
 
                 <TouchableOpacity
                     style={[
@@ -449,6 +536,8 @@ export default function EditProfileScreen() {
                         </View>
                     )}
                 </TouchableOpacity>
+                </>
+                )}
             </ScrollView>
         </KeyboardAvoidingView>
     );

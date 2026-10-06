@@ -1,6 +1,6 @@
 import type { OnboardingState, DocumentSlot, DocumentTarget } from '../types/onboarding';
 
-export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+export const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
 export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
 
 export interface FileMetadataInput {
@@ -16,7 +16,7 @@ export interface FileValidationResult {
 }
 
 /**
- * Evalúa las reglas de negocio estrictas: JPG/PNG/PDF y máximo 5MB.
+ * Evalúa las reglas de negocio estrictas: JPG/PNG/PDF y máximo 8MB.
  */
 export const validateDocumentFile = (file: FileMetadataInput): FileValidationResult => {
     if (!file.uri) {
@@ -34,7 +34,7 @@ export const validateDocumentFile = (file: FileMetadataInput): FileValidationRes
         const sizeInMB = (file.fileSize / (1024 * 1024)).toFixed(1);
         return {
             isValid: false,
-            errorMessage: `El archivo pesa ${sizeInMB}MB. El límite máximo permitido es de 5MB.`,
+            errorMessage: `El archivo pesa ${sizeInMB}MB. El límite máximo permitido es de 8MB.`,
         };
     }
     return { isValid: true, errorMessage: null };
