@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { StepIndicator } from './StepIndicator';
 import { DocumentUploadCard } from './DocumentUploadCard';
+import { useAuth } from '../../context/AuthContext';
+import Constants from 'expo-constants';
 
 export const OnboardingScreen: React.FC = () => {
     const {
@@ -29,15 +31,60 @@ export const OnboardingScreen: React.FC = () => {
         handlePrevStep,
     } = useOnboarding();
 
-    const handlePrimaryAction = () => {
+    const { token } = useAuth();
+
+    const handlePrimaryAction = async () => {
         if (!canAdvance) return;
 
         if (state.currentStep === 3) {
-            Alert.alert(
-                '¡Registro Completado con Éxito!',
-                'Tus documentos de identidad, oficios y situación fiscal han sido enviados al equipo de validación de ExpertoYa. En menos de 24 horas tu cuenta estará activa para recibir clientes.',
-                [{ text: '¡Entendido!' }]
-            );
+            try {
+                const formData = new FormData();
+                formData.append('cuit', String(state.fiscal.cuit || ''));
+
+                const appendFile = (key: string, slot: any) => {
+                    if (slot && slot.uri) {
+                        const fileObj = {
+                            uri: slot.uri,
+                            name: slot.fileName || 'archivo.jpg',
+                            type: slot.mimeType || 'image/jpeg'
+                        };
+                        formData.append(key, fileObj as any);
+                    }
+                };
+
+                appendFile('dni_frente', state.identity.dniFront);
+                appendFile('dni_dorso', state.identity.dniBack);
+                appendFile('selfie_biometrica', state.identity.biometricSelfie);
+                appendFile('antecedentes_penales', state.identity.criminalRecord);
+                appendFile('certificado_no_deudor', state.identity.foodDebtorsCertificate);
+                appendFile('constancia_afip', state.fiscal.afipProof);
+
+                const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
+                const API_URL = process.env.EXPO_PUBLIC_API_URL || (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
+
+                const response = await fetch(`${API_URL}/api/professionals/onboarding`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Error al procesar onboarding');
+                }
+
+                Alert.alert(
+                    '¡Registro Completado con Éxito!',
+                    'Tus documentos de identidad, oficios y situación fiscal han sido enviados al equipo de validación de ExpertoYa. En menos de 24 horas tu cuenta estará activa para recibir clientes.',
+                    [{ text: '¡Entendido!' }]
+                );
+            } catch (error: any) {
+                console.error("Error al enviar onboarding:", error);
+                Alert.alert("Error", error.message || "Ocurrió un problema enviando tus documentos.");
+            }
         } else {
             handleNextStep();
         }
