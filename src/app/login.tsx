@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Colors } from '@/constants/theme';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
+import { apiClient } from '@/utils/api';
 
 export default function LoginScreen() {
     const scheme = useColorScheme();
@@ -28,12 +29,9 @@ export default function LoginScreen() {
         setIsLoading(true);
 
         try {
-            const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
-            const API_URL = process.env.EXPO_PUBLIC_API_URL || (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
-
-            const response = await fetch(`${API_URL}/api/auth/login`, {
+            const response = await apiClient('/api/auth/login', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                useToken: false,
                 body: JSON.stringify({ email: email.trim().toLowerCase(), password, plataforma: 'MOBILE' })
             });
 

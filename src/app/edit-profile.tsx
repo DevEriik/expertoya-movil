@@ -20,11 +20,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { getToken } from '../utils/secureStore';
 
 import { Colors } from "@/constants/theme";
-import Constants from "expo-constants";
 import { useAuth } from "@/context/AuthContext";
+import { apiClient } from "@/utils/api";
 
 const ZONAS_SUGERIDAS = ["Neuquén", "Cipolletti", "Plottier", "Fernandez Oro", "Allen", "Cutral Co", "Zapala", "General Roca", "Centenario", "Villa Regina"];
 
@@ -44,7 +43,7 @@ export default function EditProfileScreen() {
     const insets = useSafeAreaInsets();
     const scheme = useColorScheme();
     const colors = Colors[scheme === "unspecified" ? "light" : scheme];
-    const { user, login } = useAuth();
+    const { usuario, login } = useAuth();
 
     const [isSaving, setIsSaving] = useState(false);
 
@@ -74,21 +73,10 @@ export default function EditProfileScreen() {
                 ubicacion_geografica: zonasCobertura.trim(),
             };
 
-            const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
-            const API_URL =
-                process.env.EXPO_PUBLIC_API_URL ||
-                (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
+            const endpoint = usuario?.rol === 'CLIENTE' ? '/api/auth/profile' : '/api/professionals/profile';
 
-            const token = await getToken("auth_token");
-
-            const endpoint = user?.rol === 'CLIENTE' ? '/api/auth/profile' : '/api/professionals/profile';
-
-            const response = await fetch(`${API_URL}${endpoint}`, {
+            const response = await apiClient(endpoint, {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
-                },
                 body: JSON.stringify(payload),
             });
 
@@ -131,8 +119,8 @@ export default function EditProfileScreen() {
     };
 
 
-    const [nombre, setNombre] = useState(user?.nombre || "");
-    const [apellido, setApellido] = useState(user?.apellido || "");
+    const [nombre, setNombre] = useState(usuario?.nombre || "");
+    const [apellido, setApellido] = useState(usuario?.apellido || "");
     const [telefono, setTelefono] = useState("");
     const [bio, setBio] = useState("");
     const [isLoading, setIsLoading] = useState(true);
@@ -142,19 +130,8 @@ export default function EditProfileScreen() {
             const fetchProfile = async () => {
                 setIsLoading(true);
                 try {
-                    const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
-                    const API_URL =
-                        process.env.EXPO_PUBLIC_API_URL ||
-                        (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
-
-                    const token = await getToken("auth_token");
-                    
-                    if (user?.rol === 'PROFESIONAL' || user?.rol === 'ADMIN') {
-                        const response = await fetch(`${API_URL}/api/professionals/profile`, {
-                            headers: {
-                                ...(token ? { "Authorization": `Bearer ${token}` } : {})
-                            }
-                        });
+                    if (usuario?.rol === 'PROFESIONAL' || usuario?.rol === 'ADMIN') {
+                        const response = await apiClient('/api/professionals/profile');
                         
                         if (response.ok) {
                             const data = await response.json();
@@ -166,11 +143,7 @@ export default function EditProfileScreen() {
                             if (data.foto_perfil) setAvatarUri(data.foto_perfil);
                         }
                     } else {
-                        const response = await fetch(`${API_URL}/api/auth/me`, {
-                            headers: {
-                                ...(token ? { "Authorization": `Bearer ${token}` } : {})
-                            }
-                        });
+                        const response = await apiClient('/api/auth/me');
                         if (response.ok) {
                             const data = await response.json();
                             setNombre(data.usuarioAutenticado.nombre || "");
@@ -186,7 +159,7 @@ export default function EditProfileScreen() {
             };
 
             fetchProfile();
-        }, [user])
+        }, [usuario])
     );
 
     const [selectedOficios, setSelectedOficios] = useState<number[]>([1]);
@@ -352,7 +325,7 @@ export default function EditProfileScreen() {
 
                     </View>
 
-                    {user?.rol === 'CLIENTE' && (
+                    {usuario?.rol === 'CLIENTE' && (
                         <View style={[styles.inputGroup, { marginTop: 24, padding: 16, backgroundColor: colors.backgroundSelected, borderRadius: 12 }]}>
                             <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 8 }]}>¿Eres Profesional?</Text>
                             <Text style={[styles.sectionSubtitle, { color: colors.textSecondary, marginBottom: 16 }]}>
@@ -367,7 +340,7 @@ export default function EditProfileScreen() {
                         </View>
                     )}
 
-                    {user?.rol !== 'CLIENTE' && (
+                    {usuario?.rol !== 'CLIENTE' && (
                         <>
                             <View style={styles.inputGroup}>
                                 <View style={styles.labelRow}>

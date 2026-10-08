@@ -16,7 +16,7 @@ import { Colors } from "@/constants/theme";
 import ServiceCard from "@/components/ServiceCard";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
-import { getToken } from "@/utils/secureStore";
+import { apiClient } from "@/utils/api";
 
 const MOCK_SERVICES = [
   {
@@ -41,13 +41,13 @@ export default function AccountDetailsScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
   const router = useRouter();
-  const { user } = useAuth();
+  const { usuario } = useAuth();
   const insets = useSafeAreaInsets();
   
   const [profile, setProfile] = useState({
-    nombre: user?.nombre || "Usuario",
-    apellido: user?.apellido || "",
-    trade: user?.rol === 'PROFESIONAL' ? "Profesional" : "Cliente",
+    nombre: usuario?.nombre || "Usuario",
+    apellido: usuario?.apellido || "",
+    trade: usuario?.rol === 'PROFESIONAL' ? "Profesional" : "Cliente",
     zonas: "Sin definir",
     foto_perfil: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
     estado_validado: false,
@@ -57,17 +57,7 @@ export default function AccountDetailsScreen() {
     useCallback(() => {
       const fetchProfile = async () => {
         try {
-          const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
-          const API_URL =
-            process.env.EXPO_PUBLIC_API_URL ||
-            (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
-          const token = await getToken("auth_token");
-          
-          const res = await fetch(`${API_URL}/api/professionals/profile`, {
-            headers: {
-              ...(token ? { "Authorization": `Bearer ${token}` } : {})
-            }
-          });
+          const res = await apiClient('/api/professionals/profile');
           if (res.ok) {
             const data = await res.json();
             setProfile((prev) => ({
@@ -83,10 +73,10 @@ export default function AccountDetailsScreen() {
           console.log("Error al cargar el perfil, usando datos en caché.");
         }
       };
-      if (user?.rol === 'PROFESIONAL') {
+      if (usuario?.rol === 'PROFESIONAL') {
         fetchProfile();
       }
-    }, [user])
+    }, [usuario])
   );
 
   return (
@@ -115,7 +105,7 @@ export default function AccountDetailsScreen() {
             <Text style={[styles.profileName, { color: colors.text }]}>
               {profile.nombre} {profile.apellido}
             </Text>
-            {user?.rol === 'PROFESIONAL' && (
+            {usuario?.rol === 'PROFESIONAL' && (
               <View style={styles.verifiedBadge}>
                 <Ionicons
                   name={profile.estado_validado ? "checkmark-circle" : "time-outline"}
@@ -135,7 +125,7 @@ export default function AccountDetailsScreen() {
           </View>
 
           <Text style={[styles.profileTrade, { color: colors.textSecondary }]}>
-            {user?.rol === 'PROFESIONAL' ? `${profile.trade} • ${profile.zonas}` : 'Cuenta de Cliente'}
+            {usuario?.rol === 'PROFESIONAL' ? `${profile.trade} • ${profile.zonas}` : 'Cuenta de Cliente'}
           </Text>
 
           <TouchableOpacity
@@ -150,7 +140,7 @@ export default function AccountDetailsScreen() {
         </View>
       </View>
 
-      {user?.rol === 'CLIENTE' && (
+      {usuario?.rol === 'CLIENTE' && (
         <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
           <View style={{ backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
             <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 8, color: '#1E293B' }}>¿Quieres ofrecer tus servicios?</Text>
@@ -167,7 +157,7 @@ export default function AccountDetailsScreen() {
         </View>
       )}
 
-      {user?.rol !== 'CLIENTE' && (
+      {usuario?.rol !== 'CLIENTE' && (
         <>
           <TouchableOpacity
             style={[styles.createButton, { backgroundColor: colors.primary }]}
