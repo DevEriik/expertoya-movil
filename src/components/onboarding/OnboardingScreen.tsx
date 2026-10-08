@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import Constants from "expo-constants";
-import { useAuth } from "../../context/AuthContext";
+import { apiClient } from "../../utils/api";
 import { useOnboarding } from "../../hooks/useOnboarding";
 import { DocumentUploadCard } from "./DocumentUploadCard";
 import { StepIndicator } from "./StepIndicator";
@@ -30,8 +30,6 @@ export const OnboardingScreen: React.FC = () => {
     handleNextStep,
     handlePrevStep,
   } = useOnboarding();
-
-  const { token } = useAuth();
 
   const handlePrimaryAction = async () => {
     if (!canAdvance) return;
@@ -68,21 +66,10 @@ export const OnboardingScreen: React.FC = () => {
         await appendFile("certificado_no_deudor", state.identity.foodDebtorsCertificate);
         await appendFile("constancia_afip", state.fiscal.afipProof);
 
-        const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
-        const API_URL =
-          process.env.EXPO_PUBLIC_API_URL ||
-          (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
-
-        const response = await fetch(
-          `${API_URL}/api/professionals/onboarding`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            body: formData,
-          },
-        );
+        const response = await apiClient("/api/professionals/onboarding", {
+          method: "POST",
+          body: formData,
+        });
 
         const data = await response.json();
 

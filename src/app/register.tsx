@@ -6,6 +6,7 @@ import { Colors } from '@/constants/theme';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { apiClient } from '@/utils/api';
 
 export default function RegisterScreen() {
     const scheme = useColorScheme();
@@ -47,12 +48,9 @@ export default function RegisterScreen() {
         setIsLoading(true);
 
         try {
-            const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
-            const API_URL = process.env.EXPO_PUBLIC_API_URL || (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
-
-            const response = await fetch(`${API_URL}/api/auth/register`, {
+            const response = await apiClient('/api/auth/register', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                useToken: false,
                 body: JSON.stringify({ 
                     nombre: nombre.trim(),
                     apellido: apellido.trim(),
