@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
   Alert,
@@ -11,9 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import Constants from "expo-constants";
-import { apiClient } from "../../utils/api";
 import { useOnboarding } from "../../hooks/useOnboarding";
+import { apiClient } from "../../utils/api";
 import { DocumentUploadCard } from "./DocumentUploadCard";
 import { StepIndicator } from "./StepIndicator";
 
@@ -30,6 +30,7 @@ export const OnboardingScreen: React.FC = () => {
     handleNextStep,
     handlePrevStep,
   } = useOnboarding();
+  const router = useRouter();
 
   const handlePrimaryAction = async () => {
     if (!canAdvance) return;
@@ -63,7 +64,10 @@ export const OnboardingScreen: React.FC = () => {
         await appendFile("dni_dorso", state.identity.dniBack);
         await appendFile("selfie_biometrica", state.identity.biometricSelfie);
         await appendFile("antecedentes_penales", state.identity.criminalRecord);
-        await appendFile("certificado_no_deudor", state.identity.foodDebtorsCertificate);
+        await appendFile(
+          "certificado_no_deudor",
+          state.identity.foodDebtorsCertificate,
+        );
         await appendFile("constancia_afip", state.fiscal.afipProof);
 
         const response = await apiClient("/api/professionals/onboarding", {
@@ -98,16 +102,19 @@ export const OnboardingScreen: React.FC = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.topBar}>
-          {state.currentStep > 1 ? (
-            <TouchableOpacity
-              onPress={handlePrevStep}
-              style={styles.backButton}
-            >
-              <Ionicons name="arrow-back" size={22} color="#283593" />
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 40 }} />
-          )}
+          <TouchableOpacity
+            onPress={() => {
+              if (state.currentStep > 1) {
+                handlePrevStep();
+              } else {
+                router.back();
+              }
+            }}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={22} color="#283593" />
+          </TouchableOpacity>
+
           <Text style={styles.stepText}>Paso {state.currentStep} de 3</Text>
         </View>
 
