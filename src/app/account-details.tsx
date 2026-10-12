@@ -45,11 +45,15 @@ export default function AccountDetailsScreen() {
   const [profile, setProfile] = useState({
     nombre: usuario?.nombre || "Usuario",
     apellido: usuario?.apellido || "",
-    trade: usuario?.rol === "PROFESIONAL" ? "Profesional" : "Cliente",
+    trade: usuario?.rol === "PROFESIONAL" ? "Profesional" : "Cuenta de Cliente",
     zonas: "Sin definir",
     foto_perfil:
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
     estado_validado: false,
+    estado_auditoria: null as "PENDIENTE" | "APROBADO" | "RECHAZADO" | null,
+    motivo_rechazo: null as string | null,
+    tiene_solicitud: false,
+    rol: usuario?.rol || "CLIENTE",
   });
 
   useFocusEffect(
@@ -65,18 +69,29 @@ export default function AccountDetailsScreen() {
               apellido: data.apellido || prev.apellido,
               foto_perfil: data.foto_perfil || prev.foto_perfil,
               zonas: data.ubicacion_geografica || prev.zonas,
-              estado_validado: data.estado_validado ?? prev.estado_validado,
+              trade:
+                data.rol === "PROFESIONAL" && data.estado_validado
+                  ? "Profesional"
+                  : "Cuenta de Cliente",
+              estado_validado: Boolean(data.estado_validado),
+              estado_auditoria: data.estado_auditoria || null,
+              motivo_rechazo: data.motivo_rechazo || null,
+              tiene_solicitud: Boolean(data.tiene_solicitud),
+              rol: data.rol || prev.rol,
             }));
           }
         } catch {
-          console.log("Error al cargar el perfil, usando datos en caché.");
+          console.log("Error al cargar el perfil.");
         }
       };
-      if (usuario?.rol === "PROFESIONAL") {
-        fetchProfile();
-      }
+      fetchProfile();
     }, [usuario]),
   );
+
+  const isAprobado = profile.estado_validado && profile.estado_auditoria === "APROBADO";
+  const isPendiente = profile.tiene_solicitud && profile.estado_auditoria === "PENDIENTE";
+  const isRechazado = profile.tiene_solicitud && profile.estado_auditoria === "RECHAZADO";
+  const isClienteSinSolicitud = !profile.tiene_solicitud && usuario?.rol !== "PROFESIONAL";
 
   const FigmaActionCard = ({
     icon,
@@ -135,11 +150,12 @@ export default function AccountDetailsScreen() {
       </View>
 
       <FlatList
-        data={usuario?.rol === "PROFESIONAL" ? MOCK_SERVICES : []}
+        data={isAprobado ? MOCK_SERVICES : []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 40 }}
         ListHeaderComponent={
           <View style={{ padding: 16 }}>
+            {/* Tarjeta de Perfil */}
             <View
               style={[
                 styles.profileCard,
@@ -152,45 +168,76 @@ export default function AccountDetailsScreen() {
               />
               <View style={styles.profileDetails}>
                 <View style={styles.nameRow}>
-                  <Text style={[styles.profileName, { color: colors.text }]}>
+                  <Text
+                    style={[styles.profileName, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
                     {profile.nombre} {profile.apellido}
                   </Text>
 
-                  {usuario?.rol === "PROFESIONAL" && (
+                  {/* Badges de Auditoría y Verificación */}
+                  {isAprobado && (
                     <View
                       style={[
-                        styles.verifiedBadge,
+                        styles.badgeContainer,
                         {
-                          backgroundColor: profile.estado_validado
-                            ? colors.successBg
-                            : colors.warningBg,
+                          backgroundColor:
+                            (colors as any).successBg || "rgba(14, 159, 110, 0.15)",
                         },
                       ]}
                     >
                       <Ionicons
-                        name={
-                          profile.estado_validado
-                            ? "checkmark-circle"
-                            : "time-outline"
-                        }
+                        name="checkmark-circle"
                         size={14}
-                        color={
-                          profile.estado_validado
-                            ? colors.success
-                            : colors.warning
-                        }
+                        color={(colors as any).success || "#0E9F6E"}
                       />
                       <Text
                         style={[
-                          styles.verifiedText,
-                          {
-                            color: profile.estado_validado
-                              ? colors.success
-                              : colors.warning,
-                          },
+                          styles.badgeText,
+                          { color: (colors as any).success || "#0E9F6E" },
                         ]}
                       >
-                        {profile.estado_validado ? "Aprobado" : "Pendiente"}
+                        Aprobado
+                      </Text>
+                    </View>
+                  )}
+
+                  {isPendiente && (
+                    <View
+                      style={[
+                        styles.badgeContainer,
+                        {
+                          backgroundColor:
+                            (colors as any).warningBg || "rgba(217, 119, 6, 0.15)",
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="time"
+                        size={14}
+                        color={(colors as any).warning || "#D97706"}
+                      />
+                      <Text
+                        style={[
+                          styles.badgeText,
+                          { color: (colors as any).warning || "#D97706" },
+                        ]}
+                      >
+                        Pendiente
+                      </Text>
+                    </View>
+                  )}
+
+                  {isRechazado && (
+                    <View
+                      style={[
+                        styles.badgeContainer,
+                        { backgroundColor: "rgba(220, 38, 38, 0.15)" },
+                      ]}
+                    >
+                      <Ionicons name="close-circle" size={14} color="#DC2626" />
+                      <Text style={[styles.badgeText, { color: "#DC2626" }]}>
+                        Rechazado
                       </Text>
                     </View>
                   )}
@@ -199,7 +246,7 @@ export default function AccountDetailsScreen() {
                 <Text
                   style={[styles.profileTrade, { color: colors.textSecondary }]}
                 >
-                  {usuario?.rol === "PROFESIONAL"
+                  {isAprobado
                     ? `${profile.trade} • ${profile.zonas}`
                     : "Cuenta de Cliente"}
                 </Text>
@@ -222,7 +269,93 @@ export default function AccountDetailsScreen() {
               </View>
             </View>
 
-            {usuario?.rol === "CLIENTE" && (
+            {/* CASO 1: Solicitud en Estado Pendiente de Auditoría */}
+            {isPendiente && (
+              <View style={styles.statusSectionContainer}>
+                <View style={styles.pendingCard}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={styles.pendingIconBubble}>
+                      <Ionicons name="time" size={24} color="#D97706" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pendingTitle}>Solicitud en Revisión</Text>
+                      <Text style={styles.pendingStatusBadge}>
+                        En proceso de auditoría
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.pendingMessage}>
+                    Tus documentos de identidad, oficios y situación fiscal han
+                    sido recibidos y se encuentran en proceso de verificación por
+                    el equipo de administración.
+                  </Text>
+
+                  <View style={styles.infoRowNotice}>
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={18}
+                      color="#92400E"
+                    />
+                    <Text style={styles.infoRowText}>
+                      Mientras tu legajo se encuentra en revisión, tu perfil opera
+                      como cliente común. Una vez aprobado, podrás publicar y
+                      ofrecer servicios.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* CASO 2: Solicitud Rechazada */}
+            {isRechazado && (
+              <View style={styles.statusSectionContainer}>
+                <View style={styles.rejectedCard}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={styles.rejectedIconBubble}>
+                      <Ionicons name="alert-circle" size={24} color="#DC2626" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rejectedTitle}>Solicitud Rechazada</Text>
+                      <Text style={styles.rejectedStatusBadge}>
+                        Requiere corrección de documentos
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.rejectedIntro}>
+                    Tu solicitud para registrarte como profesional fue revisada y
+                    rechazada por el siguiente motivo:
+                  </Text>
+
+                  <View style={styles.reasonContainer}>
+                    <Ionicons
+                      name="chatbubble-ellipses-outline"
+                      size={16}
+                      color="#991B1B"
+                    />
+                    <Text style={styles.reasonText}>
+                      {profile.motivo_rechazo ||
+                        "La documentación cargada no cumple con los requisitos o es ilegible."}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={() => router.push("/onboarding")}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="refresh" size={18} color="#FFFFFF" />
+                    <Text style={styles.retryButtonText}>
+                      Corregir y Reenviar Documentación
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* CASO 3: Cliente normal que aún no inició Onboarding */}
+            {isClienteSinSolicitud && (
               <>
                 <Text
                   style={[
@@ -236,7 +369,7 @@ export default function AccountDetailsScreen() {
                   icon="list-outline"
                   title="Historial de Solicitudes"
                   subtitle="Todavía no has solicitado ningún servicio. Explora el directorio para encontrar profesionales cerca de ti."
-                  iconColor={colors.info}
+                  iconColor={(colors as any).info || "#1A73E8"}
                   buttonText="Buscar Profesionales"
                   onPress={() => router.push("/(tabs)")}
                 />
@@ -260,7 +393,8 @@ export default function AccountDetailsScreen() {
               </>
             )}
 
-            {usuario?.rol !== "CLIENTE" && (
+            {/* CASO 4: Profesional Validado y Aprobado */}
+            {isAprobado && (
               <>
                 <TouchableOpacity
                   style={[
@@ -292,16 +426,18 @@ export default function AccountDetailsScreen() {
             )}
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={{ paddingHorizontal: 16 }}>
-            <ServiceCard
-              title={item.title}
-              price={item.price}
-              duration={item.duration}
-              imageUrl={item.imageUrl}
-            />
-          </View>
-        )}
+        renderItem={({ item }) =>
+          isAprobado ? (
+            <View style={{ paddingHorizontal: 16 }}>
+              <ServiceCard
+                title={item.title}
+                price={item.price}
+                duration={item.duration}
+                imageUrl={item.imageUrl}
+              />
+            </View>
+          ) : null
+        }
       />
     </View>
   );
@@ -371,17 +507,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 4,
+    gap: 8,
   },
-  profileName: { fontSize: 18, fontWeight: "800", flex: 1 },
-  verifiedBadge: {
+  profileName: { fontSize: 17, fontWeight: "700", flex: 1 },
+
+  badgeContainer: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 12,
     gap: 4,
   },
-  verifiedText: { fontSize: 11, fontWeight: "700" },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
   profileTrade: { fontSize: 13, marginBottom: 12 },
   editButton: {
     flexDirection: "row",
@@ -414,4 +556,137 @@ const styles = StyleSheet.create({
 
   primaryButton: { padding: 14, borderRadius: 12, alignItems: "center" },
   primaryButtonText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
+
+  statusSectionContainer: {
+    marginBottom: 20,
+  },
+
+  // Tarjeta Pendiente
+  pendingCard: {
+    backgroundColor: "#FFFBEB",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#FDE68A",
+    padding: 16,
+    shadowColor: "#D97706",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  pendingIconBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pendingTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#92400E",
+  },
+  pendingStatusBadge: {
+    fontSize: 12,
+    color: "#B45309",
+    fontWeight: "600",
+  },
+  pendingMessage: {
+    fontSize: 13,
+    color: "#78350F",
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  infoRowNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FEF3C7",
+    padding: 10,
+    borderRadius: 10,
+    gap: 8,
+  },
+  infoRowText: {
+    fontSize: 12,
+    color: "#92400E",
+    flex: 1,
+    lineHeight: 16,
+  },
+
+  // Tarjeta Rechazado
+  rejectedCard: {
+    backgroundColor: "#FEF2F2",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#FECACA",
+    padding: 16,
+    shadowColor: "#DC2626",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  rejectedIconBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rejectedTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#991B1B",
+  },
+  rejectedStatusBadge: {
+    fontSize: 12,
+    color: "#B91C1C",
+    fontWeight: "600",
+  },
+  rejectedIntro: {
+    fontSize: 13,
+    color: "#7F1D1D",
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  reasonContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    padding: 12,
+    borderRadius: 10,
+    gap: 8,
+    marginBottom: 14,
+  },
+  reasonText: {
+    fontSize: 13,
+    color: "#991B1B",
+    fontWeight: "600",
+    flex: 1,
+    lineHeight: 18,
+  },
+  retryButton: {
+    backgroundColor: "#DC2626",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
 });
