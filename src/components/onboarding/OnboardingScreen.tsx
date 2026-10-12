@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
 import Constants from "expo-constants";
 import { apiClient } from "../../utils/api";
@@ -18,6 +20,9 @@ import { DocumentUploadCard } from "./DocumentUploadCard";
 import { StepIndicator } from "./StepIndicator";
 
 export const OnboardingScreen: React.FC = () => {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const {
     state,
     canAdvance,
@@ -32,55 +37,66 @@ export const OnboardingScreen: React.FC = () => {
   } = useOnboarding();
 
   const handlePrimaryAction = async () => {
-    if (!canAdvance) return;
+    if (!canAdvance || isSubmitting) return;
 
     if (state.currentStep === 3) {
+      setIsSubmitting(true);
       try {
         const formData = new FormData();
         formData.append("cuit", String(state.fiscal.cuit || ""));
+        formData.append("oficios_ids", JSON.stringify(state.trades.selectedTradeIds));
 
-        const appendFile = async (key: string, slot: any) => {
+        const appendFile = (key: string, slot: any) => {
           if (slot && slot.uri) {
-            try {
-              // Convertir la URI local a Blob. Esto es infalible en Android.
-              const resp = await fetch(slot.uri);
-              const blob = await resp.blob();
-              formData.append(key, blob, slot.fileName || "archivo.jpg");
-            } catch (e) {
-              console.warn("No se pudo convertir a blob:", key, e);
-              // Fallback al método tradicional si falla el fetch local
-              const fileObj = {
-                uri: String(slot.uri),
-                name: String(slot.fileName || "archivo.jpg"),
-                type: String(slot.mimeType || "image/jpeg"),
-              };
-              formData.append(key, fileObj as any);
-            }
+            const isPdf =
+              slot.fileName?.toLowerCase().endsWith(".pdf") ||
+              slot.mimeType === "application/pdf";
+            const ext = isPdf ? "pdf" : "jpg";
+            const mime = isPdf ? "application/pdf" : (slot.mimeType || "image/jpeg");
+            const fileName = slot.fileName || `${key}.${ext}`;
+
+            formData.append(key, {
+              uri: slot.uri,
+              name: fileName,
+              type: mime,
+            } as any);
           }
         };
 
-        await appendFile("dni_frente", state.identity.dniFront);
-        await appendFile("dni_dorso", state.identity.dniBack);
-        await appendFile("selfie_biometrica", state.identity.biometricSelfie);
-        await appendFile("antecedentes_penales", state.identity.criminalRecord);
-        await appendFile("certificado_no_deudor", state.identity.foodDebtorsCertificate);
-        await appendFile("constancia_afip", state.fiscal.afipProof);
+        appendFile("dni_frente", state.identity.dniFront);
+        appendFile("dni_dorso", state.identity.dniBack);
+        appendFile("selfie_biometrica", state.identity.biometricSelfie);
+        appendFile("antecedentes_penales", state.identity.criminalRecord);
+        appendFile("certificado_no_deudor", state.identity.foodDebtorsCertificate);
+        appendFile("constancia_afip", state.fiscal.afipProof);
+
+        const licenciasSubidas = Object.values(state.trades.licenses).filter(
+          (slot: any) => slot && slot.uri,
+        );
+        for (const licencia of licenciasSubidas) {
+          appendFile("matricula_documento", licencia);
+        }
 
         const response = await apiClient("/api/professionals/onboarding", {
           method: "POST",
           body: formData,
         });
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          throw new Error(data.error || "Error al procesar onboarding");
+          throw new Error(data.detalle || data.error || "Error al procesar onboarding");
         }
 
         Alert.alert(
           "¡Registro Completado con Éxito!",
           "Tus documentos de identidad, oficios y situación fiscal han sido enviados al equipo de validación de ExpertoYa. En menos de 24 horas tu cuenta estará activa para recibir clientes.",
-          [{ text: "¡Entendido!" }],
+          [
+            {
+              text: "¡Entendido!",
+              onPress: () => router.replace("/account-details"),
+            },
+          ],
         );
       } catch (error: any) {
         console.error("Error al enviar onboarding:", error);
@@ -88,6 +104,8 @@ export const OnboardingScreen: React.FC = () => {
           "Error",
           error.message || "Ocurrió un problema enviando tus documentos.",
         );
+      } finally {
+        setIsSubmitting(false);
       }
     } else {
       handleNextStep();
@@ -484,33 +502,37 @@ export const OnboardingScreen: React.FC = () => {
         </ScrollView>
 
         <View style={styles.footer}>
-          <View style={styles.footer}>
-            <TouchableOpacity
-              onPress={handlePrimaryAction}
-              disabled={!canAdvance}
-              activeOpacity={0.8}
-              style={[
-                styles.primaryButton,
-                !canAdvance && styles.primaryButtonDisabled,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.primaryButtonText,
-                  !canAdvance && styles.primaryButtonTextDisabled,
-                ]}
-              >
-                {state.currentStep === 3
-                  ? "Finalizar Registro"
-                  : "Continuar al siguiente paso"}
-              </Text>
-              <Ionicons
-                name="arrow-forward"
-                size={18}
-                color={canAdvance ? "#FFFFFF" : "#94A3B8"}
-              />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={handlePrimaryAction}
+            disabled={!canAdvance || isSubmitting}
+            activeOpacity={0.8}
+            style={[
+              styles.primaryButton,
+              (!canAdvance || isSubmitting) && styles.primaryButtonDisabled,
+            ]}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Text
+                  style={[
+                    styles.primaryButtonText,
+                    !canAdvance && styles.primaryButtonTextDisabled,
+                  ]}
+                >
+                  {state.currentStep === 3
+                    ? "Finalizar Registro"
+                    : "Continuar al siguiente paso"}
+                </Text>
+                <Ionicons
+                  name="arrow-forward"
+                  size={18}
+                  color={canAdvance ? "#FFFFFF" : "#94A3B8"}
+                />
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>

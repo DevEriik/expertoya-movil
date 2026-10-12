@@ -43,14 +43,18 @@ export default function AccountDetailsScreen() {
   const router = useRouter();
   const { usuario } = useAuth();
   const insets = useSafeAreaInsets();
-  
+
   const [profile, setProfile] = useState({
     nombre: usuario?.nombre || "Usuario",
     apellido: usuario?.apellido || "",
-    trade: usuario?.rol === 'PROFESIONAL' ? "Profesional" : "Cliente",
+    trade: "Cuenta de Cliente",
     zonas: "Sin definir",
     foto_perfil: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
     estado_validado: false,
+    estado_auditoria: null as "PENDIENTE" | "APROBADO" | "RECHAZADO" | null,
+    motivo_rechazo: null as string | null,
+    tiene_solicitud: false,
+    rol: usuario?.rol || "CLIENTE",
   });
 
   useFocusEffect(
@@ -66,18 +70,26 @@ export default function AccountDetailsScreen() {
               apellido: data.apellido || prev.apellido,
               foto_perfil: data.foto_perfil || prev.foto_perfil,
               zonas: data.ubicacion_geografica || prev.zonas,
-              estado_validado: data.estado_validado ?? prev.estado_validado,
+              trade: data.rol === 'PROFESIONAL' && data.estado_validado ? "Profesional" : "Cuenta de Cliente",
+              estado_validado: Boolean(data.estado_validado),
+              estado_auditoria: data.estado_auditoria || null,
+              motivo_rechazo: data.motivo_rechazo || null,
+              tiene_solicitud: Boolean(data.tiene_solicitud),
+              rol: data.rol || prev.rol,
             }));
           }
         } catch {
-          console.log("Error al cargar el perfil, usando datos en caché.");
+          console.log("Error al cargar el perfil.");
         }
       };
-      if (usuario?.rol === 'PROFESIONAL') {
-        fetchProfile();
-      }
+      fetchProfile();
     }, [usuario])
   );
+
+  const isAprobado = profile.estado_validado && profile.estado_auditoria === "APROBADO";
+  const isPendiente = profile.tiene_solicitud && profile.estado_auditoria === "PENDIENTE";
+  const isRechazado = profile.tiene_solicitud && profile.estado_auditoria === "RECHAZADO";
+  const isClienteSinSolicitud = !profile.tiene_solicitud;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
@@ -102,37 +114,41 @@ export default function AccountDetailsScreen() {
 
         <View style={styles.profileDetails}>
           <View style={styles.nameRow}>
-            <Text style={[styles.profileName, { color: colors.text }]}>
+            <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>
               {profile.nombre} {profile.apellido}
             </Text>
-            {usuario?.rol === 'PROFESIONAL' && (
-              <View style={styles.verifiedBadge}>
-                <Ionicons
-                  name={profile.estado_validado ? "checkmark-circle" : "time-outline"}
-                  size={16}
-                  color={profile.estado_validado ? colors.secondary : colors.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.verifiedText,
-                    { color: profile.estado_validado ? colors.secondary : colors.textSecondary },
-                  ]}
-                >
-                  {profile.estado_validado ? "Aprobado" : "Pendiente"}
-                </Text>
+
+            {isAprobado && (
+              <View style={[styles.badgeContainer, { backgroundColor: "rgba(14, 159, 110, 0.15)" }]}>
+                <Ionicons name="checkmark-circle" size={14} color="#0E9F6E" />
+                <Text style={[styles.badgeText, { color: "#0E9F6E" }]}>Auditado</Text>
+              </View>
+            )}
+
+            {isPendiente && (
+              <View style={[styles.badgeContainer, { backgroundColor: "rgba(217, 119, 6, 0.15)" }]}>
+                <Ionicons name="time" size={14} color="#D97706" />
+                <Text style={[styles.badgeText, { color: "#D97706" }]}>Pendiente</Text>
+              </View>
+            )}
+
+            {isRechazado && (
+              <View style={[styles.badgeContainer, { backgroundColor: "rgba(220, 38, 38, 0.15)" }]}>
+                <Ionicons name="close-circle" size={14} color="#DC2626" />
+                <Text style={[styles.badgeText, { color: "#DC2626" }]}>Rechazado</Text>
               </View>
             )}
           </View>
 
           <Text style={[styles.profileTrade, { color: colors.textSecondary }]}>
-            {usuario?.rol === 'PROFESIONAL' ? `${profile.trade} • ${profile.zonas}` : 'Cuenta de Cliente'}
+            {isAprobado ? `Profesional • ${profile.zonas}` : "Cuenta de Cliente"}
           </Text>
 
           <TouchableOpacity
             style={[styles.editButton, { borderColor: colors.primary }]}
             onPress={() => router.push("/edit-profile")}
           >
-            <Ionicons name="create-outline" size={18} color={colors.primary} />
+            <Ionicons name="create-outline" size={16} color={colors.primary} />
             <Text style={[styles.editButtonText, { color: colors.primary }]}>
               Editar Perfil
             </Text>
@@ -140,24 +156,8 @@ export default function AccountDetailsScreen() {
         </View>
       </View>
 
-      {usuario?.rol === 'CLIENTE' && (
-        <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
-          <View style={{ backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 8, color: '#1E293B' }}>¿Quieres ofrecer tus servicios?</Text>
-            <Text style={{ color: '#64748B', marginBottom: 16, lineHeight: 22 }}>
-              Regístrate como profesional para validar tu identidad, cargar tu matrícula y empezar a ofrecer servicios.
-            </Text>
-            <TouchableOpacity
-              style={{ backgroundColor: colors.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
-              onPress={() => router.push('/onboarding')}
-            >
-              <Text style={{ color: '#FFF', fontWeight: '600' }}>Registro Profesional</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {usuario?.rol !== 'CLIENTE' && (
+      {/* CASO 1: Solicitud Aprobada / Auditada -> Funcionalidades de Profesional */}
+      {isAprobado && (
         <>
           <TouchableOpacity
             style={[styles.createButton, { backgroundColor: colors.primary }]}
@@ -190,6 +190,90 @@ export default function AccountDetailsScreen() {
             contentContainerStyle={styles.listContainer}
           />
         </>
+      )}
+
+      {/* CASO 2: Solicitud en Estado Pendiente de Auditoría */}
+      {isPendiente && (
+        <View style={styles.statusSectionContainer}>
+          <View style={styles.pendingCard}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.pendingIconBubble}>
+                <Ionicons name="time" size={24} color="#D97706" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pendingTitle}>Solicitud en Revisión</Text>
+                <Text style={styles.pendingStatusBadge}>En proceso de auditoría</Text>
+              </View>
+            </View>
+
+            <Text style={styles.pendingMessage}>
+              Tus documentos de identidad, oficios y situación fiscal han sido recibidos y se encuentran en proceso de verificación por el equipo de administración.
+            </Text>
+
+            <View style={styles.infoRowNotice}>
+              <Ionicons name="information-circle-outline" size={18} color="#92400E" />
+              <Text style={styles.infoRowText}>
+                Mientras tu legajo se encuentra en revisión, tu perfil opera como cliente común. Una vez aprobado, podrás publicar y ofrecer servicios.
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* CASO 3: Solicitud Rechazada */}
+      {isRechazado && (
+        <View style={styles.statusSectionContainer}>
+          <View style={styles.rejectedCard}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.rejectedIconBubble}>
+                <Ionicons name="alert-circle" size={24} color="#DC2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rejectedTitle}>Solicitud Rechazada</Text>
+                <Text style={styles.rejectedStatusBadge}>Requiere corrección de documentos</Text>
+              </View>
+            </View>
+
+            <Text style={styles.rejectedIntro}>
+              Tu solicitud para registrarte como profesional fue revisada y rechazada por el siguiente motivo:
+            </Text>
+
+            <View style={styles.reasonContainer}>
+              <Ionicons name="chatbubble-ellipses-outline" size={16} color="#991B1B" />
+              <Text style={styles.reasonText}>
+                {profile.motivo_rechazo || "La documentación cargada no cumple con los requisitos o es ilegible."}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => router.push('/onboarding')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh" size={18} color="#FFFFFF" />
+              <Text style={styles.retryButtonText}>Corregir y Reenviar Documentación</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* CASO 4: Cliente normal que aún no inició Onboarding */}
+      {isClienteSinSolicitud && (
+        <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
+          <View style={styles.promoCard}>
+            <Text style={styles.promoTitle}>¿Quieres ofrecer tus servicios?</Text>
+            <Text style={styles.promoText}>
+              Regístrate como profesional para validar tu identidad, cargar tu matrícula y empezar a ofrecer servicios.
+            </Text>
+            <TouchableOpacity
+              style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/onboarding')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.primaryActionBtnText}>Registro Profesional</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -273,24 +357,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 4,
+    gap: 8,
   },
   profileName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
     flex: 1,
   },
-  verifiedBadge: {
+  badgeContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0, 191, 165, 0.12)",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
     gap: 4,
   },
-  verifiedText: {
+  badgeText: {
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   profileTrade: {
     fontSize: 13,
@@ -310,5 +394,170 @@ const styles = StyleSheet.create({
   editButtonText: {
     fontSize: 13,
     fontWeight: "600",
+  },
+
+  statusSectionContainer: {
+    paddingHorizontal: 16,
+    marginTop: 10,
+  },
+
+  // Estilos para tarjeta de PENDIENTE
+  pendingCard: {
+    backgroundColor: "#FFFBEB",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#FDE68A",
+    padding: 16,
+    shadowColor: "#D97706",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  pendingIconBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pendingTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#92400E",
+  },
+  pendingStatusBadge: {
+    fontSize: 12,
+    color: "#B45309",
+    fontWeight: "600",
+  },
+  pendingMessage: {
+    fontSize: 13,
+    color: "#78350F",
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  infoRowNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FEF3C7",
+    padding: 10,
+    borderRadius: 10,
+    gap: 8,
+  },
+  infoRowText: {
+    fontSize: 12,
+    color: "#92400E",
+    flex: 1,
+    lineHeight: 16,
+  },
+
+  // Estilos para tarjeta de RECHAZADO
+  rejectedCard: {
+    backgroundColor: "#FEF2F2",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#FECACA",
+    padding: 16,
+    shadowColor: "#DC2626",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  rejectedIconBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rejectedTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#991B1B",
+  },
+  rejectedStatusBadge: {
+    fontSize: 12,
+    color: "#B91C1C",
+    fontWeight: "600",
+  },
+  rejectedIntro: {
+    fontSize: 13,
+    color: "#7F1D1D",
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  reasonContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    padding: 12,
+    borderRadius: 10,
+    gap: 8,
+    marginBottom: 14,
+  },
+  reasonText: {
+    fontSize: 13,
+    color: "#991B1B",
+    fontWeight: "600",
+    flex: 1,
+    lineHeight: 18,
+  },
+  retryButton: {
+    backgroundColor: "#DC2626",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  // Promo Card
+  promoCard: {
+    backgroundColor: "#F8FAFC",
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  promoTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 8,
+    color: "#1E293B",
+  },
+  promoText: {
+    color: "#64748B",
+    marginBottom: 16,
+    lineHeight: 22,
+    fontSize: 13,
+  },
+  primaryActionBtn: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  primaryActionBtnText: {
+    color: "#FFF",
+    fontWeight: "700",
+    fontSize: 14,
   },
 });
