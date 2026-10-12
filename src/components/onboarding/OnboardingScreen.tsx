@@ -14,7 +14,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 import { useOnboarding } from "../../hooks/useOnboarding";
-import { apiClient } from "../../utils/api";
+import { getToken } from "../../utils/secureStore";
+import { API_URL } from "../../utils/api";
 import { DocumentUploadCard } from "./DocumentUploadCard";
 import { StepIndicator } from "./StepIndicator";
 
@@ -34,7 +35,6 @@ export const OnboardingScreen: React.FC = () => {
     handleNextStep,
     handlePrevStep,
   } = useOnboarding();
-  const router = useRouter();
 
   const handlePrimaryAction = async () => {
     if (!canAdvance || isSubmitting) return;
@@ -42,45 +42,66 @@ export const OnboardingScreen: React.FC = () => {
     if (state.currentStep === 3) {
       setIsSubmitting(true);
       try {
-        const formData = new FormData();
-        formData.append("cuit", String(state.fiscal.cuit || ""));
-        formData.append("oficios_ids", JSON.stringify(state.trades.selectedTradeIds));
+        const token = await getToken("auth_token");
 
-        const appendFile = (key: string, slot: any) => {
-          if (slot && slot.uri) {
-            const isPdf =
-              slot.fileName?.toLowerCase().endsWith(".pdf") ||
-              slot.mimeType === "application/pdf";
-            const ext = isPdf ? "pdf" : "jpg";
-            const mime = isPdf ? "application/pdf" : (slot.mimeType || "image/jpeg");
-            const fileName = slot.fileName || `${key}.${ext}`;
+        const uploadFormData = await new Promise<Response>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", `${API_URL}/api/professionals/onboarding`);
 
-            formData.append(key, {
-              uri: slot.uri,
-              name: fileName,
-              type: mime,
-            } as any);
+          if (token) {
+            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
           }
-        };
 
-        appendFile("dni_frente", state.identity.dniFront);
-        appendFile("dni_dorso", state.identity.dniBack);
-        appendFile("selfie_biometrica", state.identity.biometricSelfie);
-        appendFile("antecedentes_penales", state.identity.criminalRecord);
-        appendFile("certificado_no_deudor", state.identity.foodDebtorsCertificate);
-        appendFile("constancia_afip", state.fiscal.afipProof);
+          xhr.onload = () => {
+            resolve(
+              new Response(xhr.responseText, {
+                status: xhr.status,
+                headers: { "Content-Type": "application/json" },
+              }),
+            );
+          };
+          xhr.onerror = () => reject(new Error("Error de red"));
+          xhr.ontimeout = () => reject(new Error("Timeout de red"));
 
-        const licenciasSubidas = Object.values(state.trades.licenses).filter(
-          (slot: any) => slot && slot.uri,
-        );
-        for (const licencia of licenciasSubidas) {
-          appendFile("matricula_documento", licencia);
-        }
+          const formData = new FormData();
+          formData.append("cuit", String(state.fiscal.cuit || ""));
+          formData.append("oficios_ids", JSON.stringify(state.trades.selectedTradeIds));
 
-        const response = await apiClient("/api/professionals/onboarding", {
-          method: "POST",
-          body: formData,
+          const appendFile = (key: string, slot: any) => {
+            if (slot && slot.uri) {
+              const isPdf =
+                slot.fileName?.toLowerCase().endsWith(".pdf") ||
+                slot.mimeType === "application/pdf";
+              const ext = isPdf ? "pdf" : "jpg";
+              const mime = isPdf ? "application/pdf" : slot.mimeType || "image/jpeg";
+              const fileName = slot.fileName || `${key}.${ext}`;
+
+              (formData as any).append(key, {
+                uri: slot.uri,
+                name: fileName,
+                type: mime,
+              });
+            }
+          };
+
+          appendFile("dni_frente", state.identity.dniFront);
+          appendFile("dni_dorso", state.identity.dniBack);
+          appendFile("selfie_biometrica", state.identity.biometricSelfie);
+          appendFile("antecedentes_penales", state.identity.criminalRecord);
+          appendFile("certificado_no_deudor", state.identity.foodDebtorsCertificate);
+          appendFile("constancia_afip", state.fiscal.afipProof);
+
+          const licenciasSubidas = Object.values(state.trades.licenses).filter(
+            (slot: any) => slot && slot.uri,
+          );
+          for (const licencia of licenciasSubidas) {
+            appendFile("matricula_documento", licencia);
+          }
+
+          xhr.send(formData);
         });
+
+        const response = uploadFormData;
 
         const data = await response.json().catch(() => ({}));
 
