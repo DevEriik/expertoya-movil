@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -11,7 +12,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 
 import { useOnboarding } from "../../hooks/useOnboarding";
 import { getToken } from "../../utils/secureStore";
@@ -106,7 +106,9 @@ export const OnboardingScreen: React.FC = () => {
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          throw new Error(data.detalle || data.error || "Error al procesar onboarding");
+          throw new Error(
+            data.detalle || data.error || "Error al procesar onboarding",
+          );
         }
 
         Alert.alert(
