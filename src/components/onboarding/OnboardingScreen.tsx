@@ -13,9 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
-import Constants from "expo-constants";
-import { apiClient } from "../../utils/api";
 import { useOnboarding } from "../../hooks/useOnboarding";
+import { apiClient } from "../../utils/api";
 import { DocumentUploadCard } from "./DocumentUploadCard";
 import { StepIndicator } from "./StepIndicator";
 
@@ -35,6 +34,7 @@ export const OnboardingScreen: React.FC = () => {
     handleNextStep,
     handlePrevStep,
   } = useOnboarding();
+  const router = useRouter();
 
   const handlePrimaryAction = async () => {
     if (!canAdvance || isSubmitting) return;
@@ -116,16 +116,19 @@ export const OnboardingScreen: React.FC = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.topBar}>
-          {state.currentStep > 1 ? (
-            <TouchableOpacity
-              onPress={handlePrevStep}
-              style={styles.backButton}
-            >
-              <Ionicons name="arrow-back" size={22} color="#283593" />
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 40 }} />
-          )}
+          <TouchableOpacity
+            onPress={() => {
+              if (state.currentStep > 1) {
+                handlePrevStep();
+              } else {
+                router.back();
+              }
+            }}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={22} color="#283593" />
+          </TouchableOpacity>
+
           <Text style={styles.stepText}>Paso {state.currentStep} de 3</Text>
         </View>
 

@@ -1,3 +1,9 @@
+import ServiceCard from "@/components/ServiceCard";
+import { Colors } from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
+import { apiClient } from "@/utils/api";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   FlatList,
@@ -5,18 +11,10 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useColorScheme,
   View,
 } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
-import { useColorScheme } from "react-native";
-import Constants from "expo-constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-import { Colors } from "@/constants/theme";
-import ServiceCard from "@/components/ServiceCard";
-import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "@/context/AuthContext";
-import { apiClient } from "@/utils/api";
 
 const MOCK_SERVICES = [
   {
@@ -39,7 +37,7 @@ const MOCK_SERVICES = [
 
 export default function AccountDetailsScreen() {
   const scheme = useColorScheme();
-  const colors = Colors[scheme === "unspecified" ? "light" : scheme];
+  const colors = Colors[scheme === "dark" ? "dark" : "light"];
   const router = useRouter();
   const { usuario } = useAuth();
   const insets = useSafeAreaInsets();
@@ -47,9 +45,10 @@ export default function AccountDetailsScreen() {
   const [profile, setProfile] = useState({
     nombre: usuario?.nombre || "Usuario",
     apellido: usuario?.apellido || "",
-    trade: "Cuenta de Cliente",
+    trade: usuario?.rol === "PROFESIONAL" ? "Profesional" : "Cuenta de Cliente",
     zonas: "Sin definir",
-    foto_perfil: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
+    foto_perfil:
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
     estado_validado: false,
     estado_auditoria: null as "PENDIENTE" | "APROBADO" | "RECHAZADO" | null,
     motivo_rechazo: null as string | null,
@@ -61,7 +60,7 @@ export default function AccountDetailsScreen() {
     useCallback(() => {
       const fetchProfile = async () => {
         try {
-          const res = await apiClient('/api/professionals/profile');
+          const res = await apiClient("/api/professionals/profile");
           if (res.ok) {
             const data = await res.json();
             setProfile((prev) => ({
@@ -70,7 +69,10 @@ export default function AccountDetailsScreen() {
               apellido: data.apellido || prev.apellido,
               foto_perfil: data.foto_perfil || prev.foto_perfil,
               zonas: data.ubicacion_geografica || prev.zonas,
-              trade: data.rol === 'PROFESIONAL' && data.estado_validado ? "Profesional" : "Cuenta de Cliente",
+              trade:
+                data.rol === "PROFESIONAL" && data.estado_validado
+                  ? "Profesional"
+                  : "Cuenta de Cliente",
               estado_validado: Boolean(data.estado_validado),
               estado_auditoria: data.estado_auditoria || null,
               motivo_rechazo: data.motivo_rechazo || null,
@@ -83,262 +85,414 @@ export default function AccountDetailsScreen() {
         }
       };
       fetchProfile();
-    }, [usuario])
+    }, [usuario]),
   );
 
   const isAprobado = profile.estado_validado && profile.estado_auditoria === "APROBADO";
   const isPendiente = profile.tiene_solicitud && profile.estado_auditoria === "PENDIENTE";
   const isRechazado = profile.tiene_solicitud && profile.estado_auditoria === "RECHAZADO";
-  const isClienteSinSolicitud = !profile.tiene_solicitud;
+  const isClienteSinSolicitud = !profile.tiene_solicitud && usuario?.rol !== "PROFESIONAL";
+
+  const FigmaActionCard = ({
+    icon,
+    title,
+    subtitle,
+    onPress,
+    iconColor,
+    buttonText,
+  }: any) => (
+    <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
+      <View style={styles.cardHeader}>
+        <Ionicons name={icon} size={20} color={iconColor} />
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
+      </View>
+      <View style={{ padding: 16, paddingTop: 0 }}>
+        <Text
+          style={{
+            color: colors.textSecondary,
+            marginBottom: 16,
+            lineHeight: 20,
+          }}
+        >
+          {subtitle}
+        </Text>
+        <TouchableOpacity
+          style={[styles.primaryButton, { backgroundColor: iconColor }]}
+          onPress={onPress}
+        >
+          <Text style={styles.primaryButtonText}>{buttonText}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Account Details</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View
         style={[
-          styles.profileCard,
-          { backgroundColor: colors.backgroundElement },
+          styles.header,
+          {
+            paddingTop: insets.top + 10,
+            backgroundColor: colors.backgroundElement,
+          },
         ]}
       >
-        <Image
-          source={{ uri: profile.foto_perfil }}
-          style={styles.avatar}
-        />
-
-        <View style={styles.profileDetails}>
-          <View style={styles.nameRow}>
-            <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>
-              {profile.nombre} {profile.apellido}
-            </Text>
-
-            {isAprobado && (
-              <View style={[styles.badgeContainer, { backgroundColor: "rgba(14, 159, 110, 0.15)" }]}>
-                <Ionicons name="checkmark-circle" size={14} color="#0E9F6E" />
-                <Text style={[styles.badgeText, { color: "#0E9F6E" }]}>Auditado</Text>
-              </View>
-            )}
-
-            {isPendiente && (
-              <View style={[styles.badgeContainer, { backgroundColor: "rgba(217, 119, 6, 0.15)" }]}>
-                <Ionicons name="time" size={14} color="#D97706" />
-                <Text style={[styles.badgeText, { color: "#D97706" }]}>Pendiente</Text>
-              </View>
-            )}
-
-            {isRechazado && (
-              <View style={[styles.badgeContainer, { backgroundColor: "rgba(220, 38, 38, 0.15)" }]}>
-                <Ionicons name="close-circle" size={14} color="#DC2626" />
-                <Text style={[styles.badgeText, { color: "#DC2626" }]}>Rechazado</Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={[styles.profileTrade, { color: colors.textSecondary }]}>
-            {isAprobado ? `Profesional • ${profile.zonas}` : "Cuenta de Cliente"}
-          </Text>
-
-          <TouchableOpacity
-            style={[styles.editButton, { borderColor: colors.primary }]}
-            onPress={() => router.push("/edit-profile")}
-          >
-            <Ionicons name="create-outline" size={16} color={colors.primary} />
-            <Text style={[styles.editButtonText, { color: colors.primary }]}>
-              Editar Perfil
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Detalles de la Cuenta
+        </Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      {/* CASO 1: Solicitud Aprobada / Auditada -> Funcionalidades de Profesional */}
-      {isAprobado && (
-        <>
-          <TouchableOpacity
-            style={[styles.createButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push("/create-service")}
-          >
-            <Ionicons
-              name="add-circle-outline"
-              size={24}
-              color="#FFF"
-              style={styles.buttonIcon}
-            />
-            <Text style={styles.buttonText}>Crear Nuevo Servicio</Text>
-          </TouchableOpacity>
+      <FlatList
+        data={isAprobado ? MOCK_SERVICES : []}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        ListHeaderComponent={
+          <View style={{ padding: 16 }}>
+            {/* Tarjeta de Perfil */}
+            <View
+              style={[
+                styles.profileCard,
+                { backgroundColor: colors.backgroundElement },
+              ]}
+            >
+              <Image
+                source={{ uri: profile.foto_perfil }}
+                style={styles.avatar}
+              />
+              <View style={styles.profileDetails}>
+                <View style={styles.nameRow}>
+                  <Text
+                    style={[styles.profileName, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {profile.nombre} {profile.apellido}
+                  </Text>
 
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Mis Servicios Publicados
-          </Text>
+                  {/* Badges de Auditoría y Verificación */}
+                  {isAprobado && (
+                    <View
+                      style={[
+                        styles.badgeContainer,
+                        {
+                          backgroundColor:
+                            (colors as any).successBg || "rgba(14, 159, 110, 0.15)",
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={14}
+                        color={(colors as any).success || "#0E9F6E"}
+                      />
+                      <Text
+                        style={[
+                          styles.badgeText,
+                          { color: (colors as any).success || "#0E9F6E" },
+                        ]}
+                      >
+                        Aprobado
+                      </Text>
+                    </View>
+                  )}
 
-          <FlatList
-            data={MOCK_SERVICES}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
+                  {isPendiente && (
+                    <View
+                      style={[
+                        styles.badgeContainer,
+                        {
+                          backgroundColor:
+                            (colors as any).warningBg || "rgba(217, 119, 6, 0.15)",
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="time"
+                        size={14}
+                        color={(colors as any).warning || "#D97706"}
+                      />
+                      <Text
+                        style={[
+                          styles.badgeText,
+                          { color: (colors as any).warning || "#D97706" },
+                        ]}
+                      >
+                        Pendiente
+                      </Text>
+                    </View>
+                  )}
+
+                  {isRechazado && (
+                    <View
+                      style={[
+                        styles.badgeContainer,
+                        { backgroundColor: "rgba(220, 38, 38, 0.15)" },
+                      ]}
+                    >
+                      <Ionicons name="close-circle" size={14} color="#DC2626" />
+                      <Text style={[styles.badgeText, { color: "#DC2626" }]}>
+                        Rechazado
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <Text
+                  style={[styles.profileTrade, { color: colors.textSecondary }]}
+                >
+                  {isAprobado
+                    ? `${profile.trade} • ${profile.zonas}`
+                    : "Cuenta de Cliente"}
+                </Text>
+
+                <TouchableOpacity
+                  style={[styles.editButton, { borderColor: colors.primary }]}
+                  onPress={() => router.push("/edit-profile")}
+                >
+                  <Ionicons
+                    name="create-outline"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text
+                    style={[styles.editButtonText, { color: colors.primary }]}
+                  >
+                    Editar Perfil
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* CASO 1: Solicitud en Estado Pendiente de Auditoría */}
+            {isPendiente && (
+              <View style={styles.statusSectionContainer}>
+                <View style={styles.pendingCard}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={styles.pendingIconBubble}>
+                      <Ionicons name="time" size={24} color="#D97706" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pendingTitle}>Solicitud en Revisión</Text>
+                      <Text style={styles.pendingStatusBadge}>
+                        En proceso de auditoría
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.pendingMessage}>
+                    Tus documentos de identidad, oficios y situación fiscal han
+                    sido recibidos y se encuentran en proceso de verificación por
+                    el equipo de administración.
+                  </Text>
+
+                  <View style={styles.infoRowNotice}>
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={18}
+                      color="#92400E"
+                    />
+                    <Text style={styles.infoRowText}>
+                      Mientras tu legajo se encuentra en revisión, tu perfil opera
+                      como cliente común. Una vez aprobado, podrás publicar y
+                      ofrecer servicios.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* CASO 2: Solicitud Rechazada */}
+            {isRechazado && (
+              <View style={styles.statusSectionContainer}>
+                <View style={styles.rejectedCard}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={styles.rejectedIconBubble}>
+                      <Ionicons name="alert-circle" size={24} color="#DC2626" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rejectedTitle}>Solicitud Rechazada</Text>
+                      <Text style={styles.rejectedStatusBadge}>
+                        Requiere corrección de documentos
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.rejectedIntro}>
+                    Tu solicitud para registrarte como profesional fue revisada y
+                    rechazada por el siguiente motivo:
+                  </Text>
+
+                  <View style={styles.reasonContainer}>
+                    <Ionicons
+                      name="chatbubble-ellipses-outline"
+                      size={16}
+                      color="#991B1B"
+                    />
+                    <Text style={styles.reasonText}>
+                      {profile.motivo_rechazo ||
+                        "La documentación cargada no cumple con los requisitos o es ilegible."}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={() => router.push("/onboarding")}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="refresh" size={18} color="#FFFFFF" />
+                    <Text style={styles.retryButtonText}>
+                      Corregir y Reenviar Documentación
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* CASO 3: Cliente normal que aún no inició Onboarding */}
+            {isClienteSinSolicitud && (
+              <>
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    { color: colors.primary, marginTop: 8 },
+                  ]}
+                >
+                  TUS SERVICIOS
+                </Text>
+                <FigmaActionCard
+                  icon="list-outline"
+                  title="Historial de Solicitudes"
+                  subtitle="Todavía no has solicitado ningún servicio. Explora el directorio para encontrar profesionales cerca de ti."
+                  iconColor={(colors as any).info || "#1A73E8"}
+                  buttonText="Buscar Profesionales"
+                  onPress={() => router.push("/(tabs)")}
+                />
+
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    { color: colors.primary, marginTop: 8 },
+                  ]}
+                >
+                  CONVIÉRTETE EN EXPERTO
+                </Text>
+                <FigmaActionCard
+                  icon="star-outline"
+                  title="Ofrece tus Servicios"
+                  subtitle="Regístrate como profesional para validar tu identidad, cargar tu matrícula y empezar a ganar dinero."
+                  iconColor={colors.primary}
+                  buttonText="Registro Profesional"
+                  onPress={() => router.push("/onboarding")}
+                />
+              </>
+            )}
+
+            {/* CASO 4: Profesional Validado y Aprobado */}
+            {isAprobado && (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.createButton,
+                    { backgroundColor: colors.primary },
+                  ]}
+                  onPress={() => router.push("/create-service")}
+                >
+                  <Ionicons
+                    name="add-circle-outline"
+                    size={24}
+                    color="#FFF"
+                    style={styles.buttonIcon}
+                  />
+                  <Text style={styles.createButtonText}>
+                    Crear Nuevo Servicio
+                  </Text>
+                </TouchableOpacity>
+
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    { color: colors.primary, marginTop: 16 },
+                  ]}
+                >
+                  MIS SERVICIOS PUBLICADOS
+                </Text>
+              </>
+            )}
+          </View>
+        }
+        renderItem={({ item }) =>
+          isAprobado ? (
+            <View style={{ paddingHorizontal: 16 }}>
               <ServiceCard
                 title={item.title}
                 price={item.price}
                 duration={item.duration}
                 imageUrl={item.imageUrl}
               />
-            )}
-            contentContainerStyle={styles.listContainer}
-          />
-        </>
-      )}
-
-      {/* CASO 2: Solicitud en Estado Pendiente de Auditoría */}
-      {isPendiente && (
-        <View style={styles.statusSectionContainer}>
-          <View style={styles.pendingCard}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.pendingIconBubble}>
-                <Ionicons name="time" size={24} color="#D97706" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.pendingTitle}>Solicitud en Revisión</Text>
-                <Text style={styles.pendingStatusBadge}>En proceso de auditoría</Text>
-              </View>
             </View>
-
-            <Text style={styles.pendingMessage}>
-              Tus documentos de identidad, oficios y situación fiscal han sido recibidos y se encuentran en proceso de verificación por el equipo de administración.
-            </Text>
-
-            <View style={styles.infoRowNotice}>
-              <Ionicons name="information-circle-outline" size={18} color="#92400E" />
-              <Text style={styles.infoRowText}>
-                Mientras tu legajo se encuentra en revisión, tu perfil opera como cliente común. Una vez aprobado, podrás publicar y ofrecer servicios.
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* CASO 3: Solicitud Rechazada */}
-      {isRechazado && (
-        <View style={styles.statusSectionContainer}>
-          <View style={styles.rejectedCard}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.rejectedIconBubble}>
-                <Ionicons name="alert-circle" size={24} color="#DC2626" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rejectedTitle}>Solicitud Rechazada</Text>
-                <Text style={styles.rejectedStatusBadge}>Requiere corrección de documentos</Text>
-              </View>
-            </View>
-
-            <Text style={styles.rejectedIntro}>
-              Tu solicitud para registrarte como profesional fue revisada y rechazada por el siguiente motivo:
-            </Text>
-
-            <View style={styles.reasonContainer}>
-              <Ionicons name="chatbubble-ellipses-outline" size={16} color="#991B1B" />
-              <Text style={styles.reasonText}>
-                {profile.motivo_rechazo || "La documentación cargada no cumple con los requisitos o es ilegible."}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => router.push('/onboarding')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="refresh" size={18} color="#FFFFFF" />
-              <Text style={styles.retryButtonText}>Corregir y Reenviar Documentación</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* CASO 4: Cliente normal que aún no inició Onboarding */}
-      {isClienteSinSolicitud && (
-        <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
-          <View style={styles.promoCard}>
-            <Text style={styles.promoTitle}>¿Quieres ofrecer tus servicios?</Text>
-            <Text style={styles.promoText}>
-              Regístrate como profesional para validar tu identidad, cargar tu matrícula y empezar a ofrecer servicios.
-            </Text>
-            <TouchableOpacity
-              style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/onboarding')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.primaryActionBtnText}>Registro Profesional</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+          ) : null
+        }
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  listContainer: {
-    padding: 16,
-  },
-  createButton: {
     flexDirection: "row",
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.05)",
+  },
+  backButton: { paddingVertical: 8, alignSelf: "flex-start" },
+  headerTitle: { fontSize: 18, fontWeight: "700" },
+
+  card: {
+    borderRadius: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 24,
+    overflow: "hidden",
   },
-  buttonIcon: {
-    marginRight: 8,
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    gap: 8,
   },
-  buttonText: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+  cardTitle: { fontSize: 16, fontWeight: "800" },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginHorizontal: 16,
-    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: "800",
+    marginBottom: 12,
+    marginLeft: 8,
+    letterSpacing: 1,
   },
+
   profileCard: {
     flexDirection: "row",
-    margin: 16,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 20,
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 24,
   },
   avatar: {
     width: 72,
@@ -347,11 +501,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#E0E1E6",
   },
-  profileDetails: {
-    flex: 1,
-    marginLeft: 14,
-    justifyContent: "center",
-  },
+  profileDetails: { flex: 1, marginLeft: 16, justifyContent: "center" },
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -359,11 +509,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     gap: 8,
   },
-  profileName: {
-    fontSize: 17,
-    fontWeight: "700",
-    flex: 1,
-  },
+  profileName: { fontSize: 17, fontWeight: "700", flex: 1 },
+
   badgeContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -376,32 +523,45 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
   },
-  profileTrade: {
-    fontSize: 13,
-    marginBottom: 10,
-  },
+
+  profileTrade: { fontSize: 13, marginBottom: 12 },
   editButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1.5,
-    borderRadius: 8,
+    borderRadius: 10,
     paddingVertical: 6,
     paddingHorizontal: 12,
     gap: 6,
     alignSelf: "flex-start",
   },
-  editButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
+  editButtonText: { fontSize: 13, fontWeight: "700" },
+
+  createButton: {
+    flexDirection: "row",
+    padding: 16,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#FF8C00",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 16,
   },
+  buttonIcon: { marginRight: 8 },
+  createButtonText: { color: "#FFF", fontSize: 16, fontWeight: "800" },
+
+  primaryButton: { padding: 14, borderRadius: 12, alignItems: "center" },
+  primaryButtonText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
 
   statusSectionContainer: {
-    paddingHorizontal: 16,
-    marginTop: 10,
+    marginBottom: 20,
   },
 
-  // Estilos para tarjeta de PENDIENTE
+  // Tarjeta Pendiente
   pendingCard: {
     backgroundColor: "#FFFBEB",
     borderRadius: 16,
@@ -459,7 +619,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  // Estilos para tarjeta de RECHAZADO
+  // Tarjeta Rechazado
   rejectedCard: {
     backgroundColor: "#FEF2F2",
     borderRadius: 16,
@@ -528,36 +688,5 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "700",
-  },
-
-  // Promo Card
-  promoCard: {
-    backgroundColor: "#F8FAFC",
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  promoTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 8,
-    color: "#1E293B",
-  },
-  promoText: {
-    color: "#64748B",
-    marginBottom: 16,
-    lineHeight: 22,
-    fontSize: 13,
-  },
-  primaryActionBtn: {
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  primaryActionBtnText: {
-    color: "#FFF",
-    fontWeight: "700",
-    fontSize: 14,
   },
 });

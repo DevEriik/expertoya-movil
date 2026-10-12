@@ -9,6 +9,7 @@ import { Platform } from "react-native";
 
 export const Colors = {
   light: {
+    // TUS COLORES ACTUALES (¡No se tocan!)
     text: "#283593", // Dark Indigo
     background: "#FDFCF4", // Cream
     primary: "#FF8C00", // Orange CTA
@@ -16,8 +17,19 @@ export const Colors = {
     backgroundElement: "#FFFFFF", // Blanco para tarjetas o el Tab Bar
     backgroundSelected: "#E0E1E6",
     textSecondary: "#60646C", // Gris para textos menos importantes
+
+    // NUEVOS COLORES SEMÁNTICOS (Para los íconos de ajustes y notificaciones)
+    info: "#1A73E8",
+    infoBg: "#E8F0FE",
+    success: "#4CAF50",
+    successBg: "#E6F4EA",
+    warning: "#F29900",
+    warningBg: "#FEF3E0",
+    grayIcon: "#8A92A6",
+    grayBg: "#F1F5F9",
   },
   dark: {
+    // TUS COLORES ACTUALES (¡No se tocan!)
     text: "#FDFCF4", // En modo oscuro invertimos el texto a crema
     background: "#121212", // Fondo muy oscuro
     primary: "#FF8C00", // El naranja se mantiene igual de vibrante
@@ -25,6 +37,16 @@ export const Colors = {
     backgroundElement: "#212225",
     backgroundSelected: "#2E3135",
     textSecondary: "#B0B4BA",
+
+    // NUEVOS COLORES SEMÁNTICOS
+    info: "#66B2FF",
+    infoBg: "#003366",
+    success: "#4CAF50",
+    successBg: "#003311",
+    warning: "#FFB74D",
+    warningBg: "#4D3300",
+    grayIcon: "#A0AAB2",
+    grayBg: "#2A2A2A",
   },
 } as const;
 
