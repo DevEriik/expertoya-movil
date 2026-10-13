@@ -14,8 +14,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useOnboarding } from "../../hooks/useOnboarding";
-import { API_URL } from "../../utils/api";
 import { getToken } from "../../utils/secureStore";
+import { API_URL } from "../../utils/api";
 import { DocumentUploadCard } from "./DocumentUploadCard";
 import { StepIndicator } from "./StepIndicator";
 
@@ -44,79 +44,64 @@ export const OnboardingScreen: React.FC = () => {
       try {
         const token = await getToken("auth_token");
 
-        const response = await new Promise<{ ok: boolean; json: () => Promise<any> }>(
-          (resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", `${API_URL}/api/professionals/onboarding`);
+        const uploadFormData = await new Promise<Response>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", `${API_URL}/api/professionals/onboarding`);
 
-            if (token) {
-              xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-            }
-
-            xhr.onload = () => {
-              const status = xhr.status;
-              const text = xhr.responseText;
-              resolve({
-                ok: status >= 200 && status < 300,
-                json: () => {
-                  try {
-                    return Promise.resolve(JSON.parse(text));
-                  } catch {
-                    return Promise.resolve({});
-                  }
-                },
-              });
-            };
-
-            xhr.onerror = () => reject(new Error("Error de red al subir documentos"));
-            xhr.ontimeout = () => reject(new Error("Tiempo de espera agotado"));
-
-            const formData = new FormData();
-            formData.append("cuit", String(state.fiscal.cuit || ""));
-            formData.append(
-              "oficios_ids",
-              JSON.stringify(state.trades.selectedTradeIds),
-            );
-
-            const appendFile = (key: string, slot: any) => {
-              if (slot && slot.uri) {
-                const isPdf =
-                  slot.fileName?.toLowerCase().endsWith(".pdf") ||
-                  slot.mimeType === "application/pdf";
-                const ext = isPdf ? "pdf" : "jpg";
-                const mime = isPdf
-                  ? "application/pdf"
-                  : slot.mimeType || "image/jpeg";
-                const fileName = slot.fileName || `${key}.${ext}`;
-
-                (formData as any).append(key, {
-                  uri: slot.uri,
-                  name: fileName,
-                  type: mime,
-                });
-              }
-            };
-
-            appendFile("dni_frente", state.identity.dniFront);
-            appendFile("dni_dorso", state.identity.dniBack);
-            appendFile("selfie_biometrica", state.identity.biometricSelfie);
-            appendFile("antecedentes_penales", state.identity.criminalRecord);
-            appendFile(
-              "certificado_no_deudor",
-              state.identity.foodDebtorsCertificate,
-            );
-            appendFile("constancia_afip", state.fiscal.afipProof);
-
-            const licenciasSubidas = Object.values(state.trades.licenses).filter(
-              (slot: any) => slot && slot.uri,
-            );
-            for (const licencia of licenciasSubidas) {
-              appendFile("matricula_documento", licencia);
-            }
-
-            xhr.send(formData);
+          if (token) {
+            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
           }
-        );
+
+          xhr.onload = () => {
+            resolve(
+              new Response(xhr.responseText, {
+                status: xhr.status,
+                headers: { "Content-Type": "application/json" },
+              }),
+            );
+          };
+          xhr.onerror = () => reject(new Error("Error de red"));
+          xhr.ontimeout = () => reject(new Error("Timeout de red"));
+
+          const formData = new FormData();
+          formData.append("cuit", String(state.fiscal.cuit || ""));
+          formData.append("oficios_ids", JSON.stringify(state.trades.selectedTradeIds));
+
+          const appendFile = (key: string, slot: any) => {
+            if (slot && slot.uri) {
+              const isPdf =
+                slot.fileName?.toLowerCase().endsWith(".pdf") ||
+                slot.mimeType === "application/pdf";
+              const ext = isPdf ? "pdf" : "jpg";
+              const mime = isPdf ? "application/pdf" : slot.mimeType || "image/jpeg";
+              const fileName = slot.fileName || `${key}.${ext}`;
+
+              (formData as any).append(key, {
+                uri: slot.uri,
+                name: fileName,
+                type: mime,
+              });
+            }
+          };
+
+          appendFile("dni_frente", state.identity.dniFront);
+          appendFile("dni_dorso", state.identity.dniBack);
+          appendFile("selfie_biometrica", state.identity.biometricSelfie);
+          appendFile("antecedentes_penales", state.identity.criminalRecord);
+          appendFile("certificado_no_deudor", state.identity.foodDebtorsCertificate);
+          appendFile("constancia_afip", state.fiscal.afipProof);
+
+          const licenciasSubidas = Object.values(state.trades.licenses).filter(
+            (slot: any) => slot && slot.uri,
+          );
+          for (const licencia of licenciasSubidas) {
+            appendFile("matricula_documento", licencia);
+          }
+
+          xhr.send(formData);
+        });
+
+        const response = uploadFormData;
 
         const data = await response.json().catch(() => ({}));
 

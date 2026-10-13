@@ -32,7 +32,7 @@ export default function SettingsScreen() {
         styles.container,
         {
           paddingTop: insets.top + 20,
-          backgroundColor: isDark ? "#121212" : "#FAFAFA",
+          backgroundColor: colors.background,
         },
       ]}
       contentContainerStyle={{ paddingBottom: 60 }}
@@ -51,7 +51,7 @@ export default function SettingsScreen() {
       <View
         style={[
           styles.card,
-          { backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF" },
+          { backgroundColor: colors.backgroundElement },
         ]}
       >
         {/* Account Details */}
