@@ -1,5 +1,6 @@
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
+import { getRoleLabel, isAdmin } from "@/utils/roles";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
@@ -15,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function SettingsScreen() {
   const scheme = useColorScheme();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, usuario } = useAuth();
   const insets = useSafeAreaInsets();
 
   const handleLogout = async () => {
@@ -25,6 +26,8 @@ export default function SettingsScreen() {
 
   const isDark = scheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
+
+  const admin = isAdmin(usuario?.rol);
 
   return (
     <ScrollView
@@ -46,13 +49,36 @@ export default function SettingsScreen() {
         >
           Administra tu cuenta y preferencias.
         </Text>
+        {usuario && (
+          <View
+            style={[
+              styles.roleBadge,
+              {
+                backgroundColor: admin
+                  ? colors.primary
+                  : colors.backgroundSelected,
+              },
+            ]}
+          >
+            <Ionicons
+              name={admin ? "shield-checkmark" : "person-outline"}
+              size={14}
+              color={admin ? "#FFFFFF" : colors.textSecondary}
+            />
+            <Text
+              style={[
+                styles.roleBadgeText,
+                { color: admin ? "#FFFFFF" : colors.textSecondary },
+              ]}
+            >
+              {getRoleLabel(usuario.rol)}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.backgroundElement },
-        ]}
+        style={[styles.card, { backgroundColor: colors.backgroundElement }]}
       >
         {/* Account Details */}
         <TouchableOpacity
@@ -365,5 +391,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     letterSpacing: 1,
+  },
+  roleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    gap: 6,
+  },
+  roleBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
 });

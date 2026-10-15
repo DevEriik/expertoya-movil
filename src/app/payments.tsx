@@ -1,5 +1,7 @@
+import { AdminNotice } from "@/components/AdminNotice";
 import { Colors } from "@/constants/theme";
-import { useAuth } from "@/context/AuthContext"; // IMPORTANTE: Traemos tu contexto
+import { useAuth } from "@/context/AuthContext";
+import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
@@ -16,7 +18,11 @@ export default function PaymentsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
-  const { usuario } = useAuth(); // Sacamos al usuario logueado
+  const { usuario } = useAuth();
+
+  const admin = isAdmin(usuario?.rol);
+  const showProSection = admin || isProfesional(usuario?.rol);
+  const showClientSection = admin || isCliente(usuario?.rol);
 
   const colors = Colors[scheme === "dark" ? "dark" : "light"];
 
@@ -79,7 +85,10 @@ export default function PaymentsScreen() {
         style={styles.content}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {usuario?.rol === "PROFESIONAL" && (
+        {admin && (
+          <AdminNotice message="Vista de administrador: ves las secciones de cliente y profesional." />
+        )}
+        {showProSection && (
           <>
             <View
               style={[styles.balanceCard, { backgroundColor: colors.primary }]}
@@ -126,7 +135,7 @@ export default function PaymentsScreen() {
           </>
         )}
 
-        {usuario?.rol === "CLIENTE" && (
+        {showClientSection && (
           <>
             <Text style={[styles.sectionTitle, { color: colors.primary }]}>
               TARJETAS GUARDADAS (PARA PAGAR)

@@ -1,5 +1,7 @@
+import { AdminNotice } from "@/components/AdminNotice";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
+import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -81,6 +83,10 @@ export default function SecurityScreen() {
   const [publicProfile, setPublicProfile] = useState(true);
   const [exactLocation, setExactLocation] = useState(false);
 
+  const admin = isAdmin(usuario?.rol);
+  const showClientPrivacy = admin || isCliente(usuario?.rol);
+  const showProPrivacy = admin || isProfesional(usuario?.rol);
+
   const FigmaToggle = ({ title, subtitle, value, onValueChange }: any) => (
     <View style={styles.settingRow}>
       <View style={styles.textContainer}>
@@ -155,6 +161,9 @@ export default function SecurityScreen() {
         style={styles.content}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
+        {admin && (
+          <AdminNotice message="Vista de administrador: ves las secciones de cliente y profesional." />
+        )}
         <View
           style={[styles.card, { backgroundColor: colors.backgroundElement }]}
         >
@@ -192,7 +201,7 @@ export default function SecurityScreen() {
             </Text>
           </View>
 
-          {usuario?.rol === "CLIENTE" && (
+          {showClientPrivacy && (
             <FigmaToggle
               title="Ocultar mi dirección exacta"
               subtitle="Solo se mostrará tu zona hasta confirmar presupuesto"
@@ -201,7 +210,16 @@ export default function SecurityScreen() {
             />
           )}
 
-          {usuario?.rol === "PROFESIONAL" && (
+          {showClientPrivacy && showProPrivacy && (
+            <View
+              style={[
+                styles.divider,
+                { backgroundColor: colors.backgroundSelected },
+              ]}
+            />
+          )}
+
+          {showProPrivacy && (
             <>
               <FigmaToggle
                 title="Perfil Público"
