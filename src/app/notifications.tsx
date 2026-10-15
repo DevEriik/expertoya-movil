@@ -1,5 +1,7 @@
+import { AdminNotice } from "@/components/AdminNotice";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
+import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -83,6 +85,25 @@ export default function NotificationsScreen() {
   const [quotesReceived, setQuotesReceived] = useState(true);
   const [jobStatus, setJobStatus] = useState(true);
 
+  const admin = isAdmin(usuario?.rol);
+  const showProSection = admin || isProfesional(usuario?.rol);
+  const showClientSection = admin || isCliente(usuario?.rol);
+  const workTitle = admin
+    ? "Solicitudes, Trabajos y Mensajes"
+    : isProfesional(usuario?.rol)
+      ? "Solicitudes y Mensajes"
+      : "Trabajos y Mensajes";
+  const messageTitle = admin
+    ? "Mensajes de Clientes y Expertos"
+    : isProfesional(usuario?.rol)
+      ? "Mensajes de Clientes"
+      : "Mensajes del Experto";
+  const escrowSubtitle = admin
+    ? "Fondos retenidos, liberados y confirmaciones de pago"
+    : isProfesional(usuario?.rol)
+      ? "Fondos retenidos y liberados"
+      : "Confirmaciones de pagos al Escrow";
+
   const FigmaToggle = ({ title, subtitle, value, onValueChange }: any) => (
     <View style={styles.settingRow}>
       <View style={styles.textContainer}>
@@ -127,6 +148,9 @@ export default function NotificationsScreen() {
         style={styles.content}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
+        {admin && (
+          <AdminNotice message="Vista de administrador: ves las secciones de cliente y profesional." />
+        )}
         <View
           style={[styles.card, { backgroundColor: colors.backgroundElement }]}
         >
@@ -137,13 +161,11 @@ export default function NotificationsScreen() {
               color={colors.primary}
             />
             <Text style={[styles.cardTitle, { color: colors.text }]}>
-              {usuario?.rol === "PROFESIONAL"
-                ? "Solicitudes y Mensajes"
-                : "Trabajos y Mensajes"}
+              {workTitle}
             </Text>
           </View>
 
-          {usuario?.rol === "PROFESIONAL" && (
+          {showProSection && (
             <>
               <FigmaToggle
                 title="Nuevas Solicitudes"
@@ -160,7 +182,7 @@ export default function NotificationsScreen() {
             </>
           )}
 
-          {usuario?.rol === "CLIENTE" && (
+          {showClientSection && (
             <>
               <FigmaToggle
                 title="Presupuestos Recibidos"
@@ -190,11 +212,7 @@ export default function NotificationsScreen() {
           )}
 
           <FigmaToggle
-            title={
-              usuario?.rol === "PROFESIONAL"
-                ? "Mensajes de Clientes"
-                : "Mensajes del Experto"
-            }
+            title={messageTitle}
             subtitle="Nuevos mensajes en el chat interno"
             value={messages}
             onValueChange={setMessages}
@@ -216,11 +234,7 @@ export default function NotificationsScreen() {
           </View>
           <FigmaToggle
             title="Actualizaciones de Pagos"
-            subtitle={
-              usuario?.rol === "PROFESIONAL"
-                ? "Fondos retenidos y liberados"
-                : "Confirmaciones de pagos al Escrow"
-            }
+            subtitle={escrowSubtitle}
             value={escrowAlerts}
             onValueChange={setEscrowAlerts}
           />
