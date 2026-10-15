@@ -21,30 +21,31 @@ export const Colors = {
     // NUEVOS COLORES SEMÁNTICOS (Para los íconos de ajustes y notificaciones)
     info: "#1A73E8",
     infoBg: "#E8F0FE",
-    success: "#4CAF50",
+    success: "#10B981",
     successBg: "#E6F4EA",
-    warning: "#F29900",
+    warning: "#F59E0B",
     warningBg: "#FEF3E0",
+    danger: "#EF4444",
     grayIcon: "#8A92A6",
     grayBg: "#F1F5F9",
   },
   dark: {
-    // TUS COLORES ACTUALES (¡No se tocan!)
-    text: "#FDFCF4", // En modo oscuro invertimos el texto a crema
-    background: "#121212", // Fondo muy oscuro
-    primary: "#FF8C00", // El naranja se mantiene igual de vibrante
-    secondary: "#00BFA5", // El verde azulado también
-    backgroundElement: "#212225",
+    text: "#FDFCF4",
+    background: "#121826", // Fondo Base
+    primary: "#FFB74D", // Naranja Suave
+    secondary: "#33EFA5", // Teal Brillante
+    backgroundElement: "#1F2937", // Superficies
     backgroundSelected: "#2E3135",
-    textSecondary: "#B0B4BA",
+    textSecondary: "#94A3B8",
 
-    // NUEVOS COLORES SEMÁNTICOS
+    // COLORES SEMÁNTICOS
     info: "#66B2FF",
     infoBg: "#003366",
-    success: "#4CAF50",
-    successBg: "#003311",
-    warning: "#FFB74D",
-    warningBg: "#4D3300",
+    success: "#34D399",
+    successBg: "#064E3B",
+    warning: "#FBBF24",
+    warningBg: "#451A03",
+    danger: "#F87171",
     grayIcon: "#A0AAB2",
     grayBg: "#2A2A2A",
   },

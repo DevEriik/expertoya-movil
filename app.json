@@ -35,6 +35,12 @@
         }
       ],
       "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "ExpertoYa usa tu ubicación para mostrarte los profesionales más cercanos a ti."
+        }
+      ],
       "@react-native-community/datetimepicker"
     ],
     "experiments": {
