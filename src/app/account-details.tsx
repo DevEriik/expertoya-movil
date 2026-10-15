@@ -2,6 +2,7 @@ import ServiceCard from "@/components/ServiceCard";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { apiClient } from "@/utils/api";
+import { isProfesional } from "@/utils/roles";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
@@ -45,7 +46,7 @@ export default function AccountDetailsScreen() {
   const [profile, setProfile] = useState({
     nombre: usuario?.nombre || "Usuario",
     apellido: usuario?.apellido || "",
-    trade: usuario?.rol === "PROFESIONAL" ? "Profesional" : "Cuenta de Cliente",
+    trade: isProfesional(usuario?.rol) ? "Profesional" : "Cuenta de Cliente",
     zonas: "Sin definir",
     foto_perfil:
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
@@ -88,10 +89,14 @@ export default function AccountDetailsScreen() {
     }, [usuario]),
   );
 
-  const isAprobado = profile.estado_validado && profile.estado_auditoria === "APROBADO";
-  const isPendiente = profile.tiene_solicitud && profile.estado_auditoria === "PENDIENTE";
-  const isRechazado = profile.tiene_solicitud && profile.estado_auditoria === "RECHAZADO";
-  const isClienteSinSolicitud = !profile.tiene_solicitud && usuario?.rol !== "PROFESIONAL";
+  const isAprobado =
+    profile.estado_validado && profile.estado_auditoria === "APROBADO";
+  const isPendiente =
+    profile.tiene_solicitud && profile.estado_auditoria === "PENDIENTE";
+  const isRechazado =
+    profile.tiene_solicitud && profile.estado_auditoria === "RECHAZADO";
+  const isClienteSinSolicitud =
+    !profile.tiene_solicitud && !isProfesional(usuario?.rol);
 
   const FigmaActionCard = ({
     icon,
@@ -182,7 +187,8 @@ export default function AccountDetailsScreen() {
                         styles.badgeContainer,
                         {
                           backgroundColor:
-                            (colors as any).successBg || "rgba(14, 159, 110, 0.15)",
+                            (colors as any).successBg ||
+                            "rgba(14, 159, 110, 0.15)",
                         },
                       ]}
                     >
@@ -208,7 +214,8 @@ export default function AccountDetailsScreen() {
                         styles.badgeContainer,
                         {
                           backgroundColor:
-                            (colors as any).warningBg || "rgba(217, 119, 6, 0.15)",
+                            (colors as any).warningBg ||
+                            "rgba(217, 119, 6, 0.15)",
                         },
                       ]}
                     >
@@ -278,7 +285,9 @@ export default function AccountDetailsScreen() {
                       <Ionicons name="time" size={24} color="#D97706" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.pendingTitle}>Solicitud en Revisión</Text>
+                      <Text style={styles.pendingTitle}>
+                        Solicitud en Revisión
+                      </Text>
                       <Text style={styles.pendingStatusBadge}>
                         En proceso de auditoría
                       </Text>
@@ -287,8 +296,8 @@ export default function AccountDetailsScreen() {
 
                   <Text style={styles.pendingMessage}>
                     Tus documentos de identidad, oficios y situación fiscal han
-                    sido recibidos y se encuentran en proceso de verificación por
-                    el equipo de administración.
+                    sido recibidos y se encuentran en proceso de verificación
+                    por el equipo de administración.
                   </Text>
 
                   <View style={styles.infoRowNotice}>
@@ -298,9 +307,9 @@ export default function AccountDetailsScreen() {
                       color="#92400E"
                     />
                     <Text style={styles.infoRowText}>
-                      Mientras tu legajo se encuentra en revisión, tu perfil opera
-                      como cliente común. Una vez aprobado, podrás publicar y
-                      ofrecer servicios.
+                      Mientras tu legajo se encuentra en revisión, tu perfil
+                      opera como cliente común. Una vez aprobado, podrás
+                      publicar y ofrecer servicios.
                     </Text>
                   </View>
                 </View>
@@ -316,7 +325,9 @@ export default function AccountDetailsScreen() {
                       <Ionicons name="alert-circle" size={24} color="#DC2626" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.rejectedTitle}>Solicitud Rechazada</Text>
+                      <Text style={styles.rejectedTitle}>
+                        Solicitud Rechazada
+                      </Text>
                       <Text style={styles.rejectedStatusBadge}>
                         Requiere corrección de documentos
                       </Text>
@@ -324,8 +335,8 @@ export default function AccountDetailsScreen() {
                   </View>
 
                   <Text style={styles.rejectedIntro}>
-                    Tu solicitud para registrarte como profesional fue revisada y
-                    rechazada por el siguiente motivo:
+                    Tu solicitud para registrarte como profesional fue revisada
+                    y rechazada por el siguiente motivo:
                   </Text>
 
                   <View style={styles.reasonContainer}>
