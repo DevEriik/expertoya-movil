@@ -9,6 +9,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -154,8 +155,15 @@ export default function BusquedaScreen() {
         <Image
           source={{
             uri:
-              item.usuario.fotoPerfil ||
-              `https://ui-avatars.com/api/?name=${item.usuario.nombre}+${item.usuario.apellido}`,
+              item.usuario.fotoPerfil &&
+              !(
+                Platform.OS === "web" &&
+                item.usuario.fotoPerfil.startsWith("file://")
+              )
+                ? item.usuario.fotoPerfil
+                : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                    `${item.usuario.nombre} ${item.usuario.apellido}`,
+                  )}`,
           }}
           style={styles.avatar}
         />

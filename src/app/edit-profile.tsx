@@ -1,4 +1,4 @@
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 
 import {
@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -17,10 +18,13 @@ import {
 } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import ProfilePreviewModal from "@/components/ProfilePreviewModal";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { apiClient } from "@/utils/api";
@@ -49,10 +53,32 @@ const OFICIOS_DISPONIBLES = [
   { id: 7, nombre: "Albañilería" },
 ];
 
+const DIAS_SEMANA_DEFAULT = [
+  { dia_semana: 1, nombre: "Lunes", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
+  { dia_semana: 2, nombre: "Martes", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
+  { dia_semana: 3, nombre: "Miércoles", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
+  { dia_semana: 4, nombre: "Jueves", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
+  { dia_semana: 5, nombre: "Viernes", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
+  { dia_semana: 6, nombre: "Sábado", activo: false, hora_inicio: "09:00", hora_fin: "13:00" },
+  { dia_semana: 7, nombre: "Domingo", activo: false, hora_inicio: "09:00", hora_fin: "13:00" },
+];
+
+const DEFAULT_AVATAR =
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop";
+
+const getSafeAvatarUri = (uri?: string | null) => {
+  if (!uri) return DEFAULT_AVATAR;
+  if (Platform.OS === "web" && uri.startsWith("file://")) {
+    return DEFAULT_AVATAR;
+  }
+  return uri;
+};
+
 export default function EditProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
+  const isDark = scheme === "dark";
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
   const { usuario, login } = useAuth();
 
@@ -61,6 +87,70 @@ export default function EditProfileScreen() {
   const showProFields = admin || isProfesional(usuario?.rol);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [dias, setDias] = useState(DIAS_SEMANA_DEFAULT);
+  const [pickerState, setPickerState] = useState<{
+    visible: boolean;
+    diaSemana: number;
+    campo: "hora_inicio" | "hora_fin";
+    date: Date;
+  }>({
+    visible: false,
+    diaSemana: 1,
+    campo: "hora_inicio",
+    date: new Date(),
+  });
+
+  const handleToggleDia = (diaSemana: number, activo: boolean) => {
+    setDias((prev) =>
+      prev.map((d) => (d.dia_semana === diaSemana ? { ...d, activo } : d)),
+    );
+  };
+
+  const openTimePicker = (
+    diaSemana: number,
+    campo: "hora_inicio" | "hora_fin",
+    horaActual: string,
+  ) => {
+    const [hours, minutes] = horaActual.split(":").map(Number);
+    const d = new Date();
+    d.setHours(hours || 8, minutes || 0, 0, 0);
+
+    setPickerState({
+      visible: true,
+      diaSemana,
+      campo,
+      date: d,
+    });
+  };
+
+  const handleTimeChange = (
+    event: DateTimePickerEvent,
+    selectedDate?: Date,
+  ) => {
+    if (Platform.OS === "android") {
+      setPickerState((prev) => ({ ...prev, visible: false }));
+    }
+
+    if (event.type === "dismissed" || !selectedDate) {
+      return;
+    }
+
+    const hours = String(selectedDate.getHours()).padStart(2, "0");
+    const minutes = String(selectedDate.getMinutes()).padStart(2, "0");
+    const formattedTime = `${hours}:${minutes}`;
+
+    setDias((prev) =>
+      prev.map((d) =>
+        d.dia_semana === pickerState.diaSemana
+          ? { ...d, [pickerState.campo]: formattedTime }
+          : d,
+      ),
+    );
+
+    if (Platform.OS === "ios") {
+      setPickerState((prev) => ({ ...prev, visible: false }));
+    }
+  };
 
   const handleSave = async () => {
     if (!nombre.trim() || !apellido.trim()) {
@@ -79,16 +169,33 @@ export default function EditProfileScreen() {
       return;
     }
 
+    if (showProFields) {
+      const hayHorarioInvalido = dias.some(
+        (d) => d.activo && d.hora_inicio >= d.hora_fin,
+      );
+      if (hayHorarioInvalido) {
+        Alert.alert(
+          "Horario inválido",
+          "Por favor verifica que la hora de finalización sea posterior a la de inicio en todos los días activos.",
+        );
+        return;
+      }
+    }
+
     setIsSaving(true);
 
     try {
+      const isEphemeralUri =
+        avatarUri.startsWith("blob:") || avatarUri.startsWith("file://");
+
       const payload = {
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         telefono: telefono.trim(),
-        foto_perfil: avatarUri,
+        foto_perfil: isEphemeralUri ? undefined : avatarUri,
         descripcion_perfil: bio.trim(),
         ubicacion_geografica: zonasCobertura.trim(),
+        disponible,
       };
 
       const endpoint = isCliente(usuario?.rol)
@@ -101,6 +208,21 @@ export default function EditProfileScreen() {
       });
 
       if (response.ok) {
+        if (showProFields) {
+          const horariosActivos = dias
+            .filter((d) => d.activo)
+            .map((d) => ({
+              dia_semana: d.dia_semana,
+              hora_inicio: d.hora_inicio,
+              hora_fin: d.hora_fin,
+            }));
+
+          await apiClient("/api/professionals/availability", {
+            method: "PUT",
+            body: JSON.stringify({ horarios: horariosActivos }),
+          });
+        }
+
         Alert.alert(
           "¡Perfil Actualizado!",
           "Tus cambios han sido guardados exitosamente.",
@@ -111,7 +233,7 @@ export default function EditProfileScreen() {
         Alert.alert(
           "Error al actualizar",
           errorData.error ||
-            "Hubo un problema al guardar los datos en el servidor.",
+          "Hubo un problema al guardar los datos en el servidor.",
           [{ text: "Aceptar" }],
         );
       }
@@ -127,9 +249,7 @@ export default function EditProfileScreen() {
     }
   };
 
-  const [avatarUri, setAvatarUri] = useState<string>(
-    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
-  );
+  const [avatarUri, setAvatarUri] = useState<string>(DEFAULT_AVATAR);
 
   const [zonasCobertura, setZonasCobertura] = useState(
     "Neuquén, Cipolletti, Plottier",
@@ -147,6 +267,8 @@ export default function EditProfileScreen() {
   const [apellido, setApellido] = useState(usuario?.apellido || "");
   const [telefono, setTelefono] = useState("");
   const [bio, setBio] = useState("");
+  const [disponible, setDisponible] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useFocusEffect(
@@ -164,7 +286,40 @@ export default function EditProfileScreen() {
               setTelefono(data.telefono || "");
               setBio(data.descripcion_perfil || "");
               setZonasCobertura(data.ubicacion_geografica || "");
-              if (data.foto_perfil) setAvatarUri(data.foto_perfil);
+              if (data.foto_perfil) {
+                const isExpired =
+                  data.foto_perfil.startsWith("blob:") ||
+                  (Platform.OS === "web" && data.foto_perfil.startsWith("file://"));
+                if (!isExpired) {
+                  setAvatarUri(data.foto_perfil);
+                }
+              }
+              if (data.disponible !== undefined) {
+                setDisponible(Boolean(data.disponible));
+              }
+            }
+
+            const resDispo = await apiClient("/api/professionals/availability");
+            if (resDispo.ok) {
+              const dataDispo = await resDispo.json();
+              if (Array.isArray(dataDispo) && dataDispo.length > 0) {
+                setDias((prevDias) =>
+                  prevDias.map((dia) => {
+                    const match = dataDispo.find(
+                      (d: any) => d.dia_semana === dia.dia_semana,
+                    );
+                    if (match) {
+                      return {
+                        ...dia,
+                        activo: true,
+                        hora_inicio: match.hora_inicio,
+                        hora_fin: match.hora_fin,
+                      };
+                    }
+                    return { ...dia, activo: false };
+                  }),
+                );
+              }
             }
           } else {
             const response = await apiClient("/api/auth/me");
@@ -242,7 +397,13 @@ export default function EditProfileScreen() {
       >
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace("/profile");
+            }
+          }}
           accessibilityLabel="Volver atrás"
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -275,7 +436,11 @@ export default function EditProfileScreen() {
           <>
             <View style={styles.avatarSection}>
               <View style={styles.avatarWrapper}>
-                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+                <Image
+                  source={{ uri: getSafeAvatarUri(avatarUri) }}
+                  style={styles.avatarImage}
+                  onError={() => setAvatarUri(DEFAULT_AVATAR)}
+                />
                 <TouchableOpacity
                   style={[
                     styles.cameraButton,
@@ -414,6 +579,93 @@ export default function EditProfileScreen() {
 
             {showProFields && (
               <>
+                {/* Switch de Disponibilidad / Modo Vacaciones */}
+                <View
+                  style={[
+                    styles.statusCard,
+                    {
+                      backgroundColor: disponible
+                        ? colors.backgroundElement
+                        : ((colors as any).warningBg || "#FEF3E0"),
+                      borderColor: disponible
+                        ? colors.backgroundSelected
+                        : ((colors as any).warning || "#F59E0B"),
+                    },
+                  ]}
+                >
+                  <View style={styles.statusHeaderRow}>
+                    <View style={styles.statusIconTitleRow}>
+                      <View
+                        style={[
+                          styles.statusIconBadge,
+                          {
+                            backgroundColor: disponible
+                              ? ((colors as any).successBg || "#E6F4EA")
+                              : ((colors as any).warningBg || "#FEF3E0"),
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={disponible ? "checkmark-circle" : "pause-circle"}
+                          size={22}
+                          color={
+                            disponible
+                              ? ((colors as any).success || "#10B981")
+                              : ((colors as any).warning || "#F59E0B")
+                          }
+                        />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text
+                          style={[
+                            styles.statusCardTitle,
+                            { color: colors.text },
+                          ]}
+                        >
+                          {disponible
+                            ? "Disponible para Trabajar"
+                            : "Modo Pausa / Vacaciones"}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.statusCardBadgeText,
+                            {
+                              color: disponible
+                                ? ((colors as any).success || "#10B981")
+                                : ((colors as any).warning || "#F59E0B"),
+                            },
+                          ]}
+                        >
+                          {disponible
+                            ? "Visible en búsquedas"
+                            : "Oculto de las búsquedas"}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Switch
+                      value={disponible}
+                      onValueChange={setDisponible}
+                      trackColor={{
+                        false: colors.backgroundSelected,
+                        true: colors.secondary,
+                      }}
+                      thumbColor={disponible ? "#FFF" : "#F4F4F5"}
+                    />
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.statusCardDescription,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {disponible
+                      ? "Tu perfil aparece en los resultados de búsqueda y estás disponible para recibir nuevas contrataciones."
+                      : "Tu perfil está en pausa. No aparecerás en los resultados de búsqueda hasta que lo reactives (tus chats y trabajos en curso siguen activos)."}
+                  </Text>
+                </View>
+
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
                     <Text style={[styles.label, { color: colors.text }]}>
@@ -487,13 +739,13 @@ export default function EditProfileScreen() {
                             styles.chip,
                             isSelected
                               ? {
-                                  backgroundColor: colors.secondary,
-                                  borderColor: colors.secondary,
-                                }
+                                backgroundColor: colors.secondary,
+                                borderColor: colors.secondary,
+                              }
                               : {
-                                  backgroundColor: colors.backgroundElement,
-                                  borderColor: colors.backgroundSelected,
-                                },
+                                backgroundColor: colors.backgroundElement,
+                                borderColor: colors.backgroundSelected,
+                              },
                           ]}
                           onPress={() => toggleOficio(oficio.id)}
                           activeOpacity={0.7}
@@ -596,7 +848,207 @@ export default function EditProfileScreen() {
                     ))}
                   </View>
                 </View>
+
+                {/* Sección 4: Franja Horaria de Trabajo */}
+                <View style={styles.sectionContainer}>
+                  <View style={styles.labelRow}>
+                    <View style={styles.labelWithIcon}>
+                      <Ionicons
+                        name="time-outline"
+                        size={18}
+                        color={colors.text}
+                      />
+                      <Text
+                        style={[
+                          styles.sectionTitle,
+                          {
+                            color: colors.text,
+                            marginBottom: 0,
+                            marginLeft: 6,
+                          },
+                        ]}
+                      >
+                        Franja Horaria de Atención
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    style={[
+                      styles.sectionSubtitle,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    Define los días y rangos de horario en los que puedes recibir solicitudes.
+                  </Text>
+
+                  {dias.map((dia) => {
+                    const esInvalido =
+                      dia.activo && dia.hora_inicio >= dia.hora_fin;
+                    return (
+                      <View
+                        key={dia.dia_semana}
+                        style={[
+                          styles.dayCard,
+                          {
+                            backgroundColor: colors.backgroundElement,
+                            borderColor: colors.backgroundSelected,
+                          },
+                        ]}
+                      >
+                        <View style={styles.dayHeader}>
+                          <Text
+                            style={[
+                              styles.dayName,
+                              {
+                                color: dia.activo
+                                  ? colors.text
+                                  : colors.textSecondary,
+                                fontWeight: dia.activo ? "700" : "500",
+                              },
+                            ]}
+                          >
+                            {dia.nombre}
+                          </Text>
+                          <Switch
+                            value={dia.activo}
+                            onValueChange={(val) =>
+                              handleToggleDia(dia.dia_semana, val)
+                            }
+                            trackColor={{
+                              false: colors.backgroundSelected,
+                              true: colors.secondary,
+                            }}
+                            thumbColor={dia.activo ? "#FFF" : "#F4F4F5"}
+                          />
+                        </View>
+
+                        {dia.activo && (
+                          <View style={styles.dayTimesContainer}>
+                            <View style={styles.timeButtonsRow}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.timeButton,
+                                  {
+                                    backgroundColor: colors.background,
+                                    borderColor: colors.backgroundSelected,
+                                  },
+                                ]}
+                                onPress={() =>
+                                  openTimePicker(
+                                    dia.dia_semana,
+                                    "hora_inicio",
+                                    dia.hora_inicio,
+                                  )
+                                }
+                                activeOpacity={0.7}
+                              >
+                                <Text
+                                  style={[
+                                    styles.timeLabel,
+                                    { color: colors.textSecondary },
+                                  ]}
+                                >
+                                  Desde
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.timeValue,
+                                    { color: colors.text },
+                                  ]}
+                                >
+                                  {dia.hora_inicio}
+                                </Text>
+                              </TouchableOpacity>
+
+                              <Text
+                                style={[
+                                  styles.timeSeparator,
+                                  { color: colors.textSecondary },
+                                ]}
+                              >
+                                —
+                              </Text>
+
+                              <TouchableOpacity
+                                style={[
+                                  styles.timeButton,
+                                  {
+                                    backgroundColor: colors.background,
+                                    borderColor: colors.backgroundSelected,
+                                  },
+                                ]}
+                                onPress={() =>
+                                  openTimePicker(
+                                    dia.dia_semana,
+                                    "hora_fin",
+                                    dia.hora_fin,
+                                  )
+                                }
+                                activeOpacity={0.7}
+                              >
+                                <Text
+                                  style={[
+                                    styles.timeLabel,
+                                    { color: colors.textSecondary },
+                                  ]}
+                                >
+                                  Hasta
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.timeValue,
+                                    { color: colors.text },
+                                  ]}
+                                >
+                                  {dia.hora_fin}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+
+                            {esInvalido && (
+                              <Text
+                                style={[
+                                  styles.timeErrorText,
+                                  { color: colors.danger },
+                                ]}
+                              >
+                                La hora de finalización debe ser posterior a la de inicio.
+                              </Text>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
               </>
+            )}
+
+            {showProFields && (
+              <TouchableOpacity
+                style={[
+                  styles.previewButton,
+                  {
+                    borderColor: colors.primary,
+                    backgroundColor:
+                      scheme === "dark"
+                        ? "rgba(255, 140, 0, 0.12)"
+                        : "rgba(255, 140, 0, 0.08)",
+                  },
+                ]}
+                onPress={() => setShowPreview(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="eye-outline" size={20} color={colors.primary} />
+                <Text
+                  style={[
+                    styles.previewButtonText,
+                    { color: colors.primary },
+                  ]}
+                >
+                  Previsualizar Perfil (Vista Cliente)
+                </Text>
+              </TouchableOpacity>
             )}
 
             <TouchableOpacity
@@ -631,7 +1083,32 @@ export default function EditProfileScreen() {
             </TouchableOpacity>
           </>
         )}
+
+        {pickerState.visible && (
+          <DateTimePicker
+            value={pickerState.date}
+            mode="time"
+            is24Hour={true}
+            display={Platform.OS === "ios" ? "spinner" : "default"}
+            onChange={handleTimeChange}
+          />
+        )}
       </ScrollView>
+
+      <ProfilePreviewModal
+        visible={showPreview}
+        onClose={() => setShowPreview(false)}
+        onConfirmSave={handleSave}
+        nombre={nombre}
+        apellido={apellido}
+        fotoPerfil={getSafeAvatarUri(avatarUri)}
+        bio={bio}
+        zonasCobertura={zonasCobertura}
+        oficiosNombres={selectedOficios.map(
+          (id) =>
+            OFICIOS_DISPONIBLES.find((o) => o.id === id)?.nombre || "Oficio",
+        )}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -830,6 +1307,110 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: "#FFF",
     fontSize: 16,
+    fontWeight: "700",
+  },
+  dayCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 10,
+  },
+  dayHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dayName: {
+    fontSize: 15,
+  },
+  dayTimesContainer: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.06)",
+  },
+  timeButtonsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  timeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  timeLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+    marginBottom: 2,
+  },
+  timeValue: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  timeSeparator: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  timeErrorText: {
+    fontSize: 12,
+    fontWeight: "500",
+    marginTop: 6,
+  },
+  statusCard: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 16,
+    marginBottom: 20,
+  },
+  statusHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  statusIconTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 10,
+  },
+  statusIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusCardTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  statusCardBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 1,
+  },
+  statusCardDescription: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginTop: 10,
+  },
+  previewButton: {
+    marginTop: 24,
+    minHeight: 50,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  previewButtonText: {
+    fontSize: 15,
     fontWeight: "700",
   },
 });
