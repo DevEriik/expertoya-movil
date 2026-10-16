@@ -1,12 +1,22 @@
 import ServiceCard from "@/components/ServiceCard";
+import ServiceDetailModal from "@/components/ServiceDetailModal";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
+import { ServicioPublicadoItem } from "@/types/service";
 import { apiClient } from "@/utils/api";
 import { isProfesional } from "@/utils/roles";
+import {
+  deleteService,
+  getServices,
+  MAX_ACTIVE_SERVICES,
+  toggleServiceStatus,
+} from "@/utils/servicesStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
+  DeviceEventEmitter,
   FlatList,
   Image,
   Platform,
@@ -18,31 +28,18 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const MOCK_SERVICES = [
-  {
-    id: "1",
-    title: "Reparación de Tablero Eléctrico",
-    price: 45000,
-    duration: "2-3 horas",
-    imageUrl:
-      "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=200&auto=format&fit=crop",
-  },
-  {
-    id: "2",
-    title: "Instalación de Tomacorrientes y Llaves de Luz",
-    price: 15000,
-    duration: "1 hora",
-    imageUrl:
-      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=200&auto=format&fit=crop",
-  },
-];
-
 export default function AccountDetailsScreen() {
   const scheme = useColorScheme();
-  const colors = Colors[scheme === "dark" ? "dark" : "light"];
+  const isDark = scheme === "dark";
+  const colors = Colors[isDark ? "dark" : "light"];
   const router = useRouter();
   const { usuario } = useAuth();
   const insets = useSafeAreaInsets();
+
+  const [services, setServices] = useState<ServicioPublicadoItem[]>([]);
+  const [selectedServiceForDetail, setSelectedServiceForDetail] =
+    useState<ServicioPublicadoItem | null>(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   const [profile, setProfile] = useState({
     nombre: usuario?.nombre || "Usuario",
@@ -86,9 +83,32 @@ export default function AccountDetailsScreen() {
           console.log("Error al cargar el perfil.");
         }
       };
+
+      const loadServices = async () => {
+        try {
+          const list = await getServices();
+          setServices(list);
+        } catch (e) {
+          console.log("Error al cargar servicios:", e);
+        }
+      };
+
       fetchProfile();
+      loadServices();
     }, [usuario]),
   );
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("servicesChanged", async () => {
+      const list = await getServices();
+      setServices(list);
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
+
+  const activeServicesCount = services.filter((s) => s.servicio_activo).length;
 
   const isAprobado =
     profile.estado_validado && profile.estado_auditoria === "APROBADO";
@@ -144,7 +164,13 @@ export default function AccountDetailsScreen() {
         ]}
       >
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace("/(tabs)/profile");
+            }
+          }}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -156,7 +182,7 @@ export default function AccountDetailsScreen() {
       </View>
 
       <FlatList
-        data={isAprobado ? MOCK_SERVICES : []}
+        data={isAprobado ? services : []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 40 }}
         ListHeaderComponent={
@@ -172,6 +198,7 @@ export default function AccountDetailsScreen() {
                 source={{
                   uri:
                     profile.foto_perfil &&
+                    !avatarError &&
                     !(
                       Platform.OS === "web" &&
                       profile.foto_perfil.startsWith("file://")
@@ -179,6 +206,7 @@ export default function AccountDetailsScreen() {
                       ? profile.foto_perfil
                       : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
                 }}
+                onError={() => setAvatarError(true)}
                 style={styles.avatar}
               />
               <View style={styles.profileDetails}>
@@ -422,7 +450,24 @@ export default function AccountDetailsScreen() {
                     styles.createButton,
                     { backgroundColor: colors.primary },
                   ]}
-                  onPress={() => router.push("/create-service")}
+                  onPress={() => {
+                    if (activeServicesCount >= MAX_ACTIVE_SERVICES) {
+                      Alert.alert(
+                        "Límite de Servicios Activos Alcanzado",
+                        `Has alcanzado el límite inicial de ${MAX_ACTIVE_SERVICES} servicios activos. Puedes publicar nuevos servicios guardándolos como pausados, o pausar uno existente primero.`,
+                        [
+                          { text: "Cancelar", style: "cancel" },
+                          {
+                            text: "Crear de todas formas",
+                            onPress: () => router.push("/create-service"),
+                          },
+                        ],
+                      );
+                    } else {
+                      router.push("/create-service");
+                    }
+                  }}
+                  activeOpacity={0.8}
                 >
                   <Ionicons
                     name="add-circle-outline"
@@ -435,14 +480,96 @@ export default function AccountDetailsScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    { color: colors.primary, marginTop: 16 },
-                  ]}
-                >
-                  MIS SERVICIOS PUBLICADOS
-                </Text>
+                {/* Encabezado con contador accesible de 30 servicios */}
+                <View style={styles.servicesHeaderRow}>
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      { color: colors.primary, marginBottom: 0, marginLeft: 0 },
+                    ]}
+                  >
+                    MIS SERVICIOS PUBLICADOS
+                  </Text>
+
+                  <View
+                    style={[
+                      styles.counterPill,
+                      {
+                        backgroundColor:
+                          activeServicesCount >= MAX_ACTIVE_SERVICES
+                            ? "rgba(239, 68, 68, 0.12)"
+                            : isDark
+                            ? "rgba(255, 183, 77, 0.15)"
+                            : "rgba(255, 140, 0, 0.1)",
+                        borderColor:
+                          activeServicesCount >= MAX_ACTIVE_SERVICES
+                            ? "#EF4444"
+                            : colors.primary,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        activeServicesCount >= MAX_ACTIVE_SERVICES
+                          ? "alert-circle"
+                          : "layers-outline"
+                      }
+                      size={12}
+                      color={
+                        activeServicesCount >= MAX_ACTIVE_SERVICES
+                          ? "#EF4444"
+                          : colors.primary
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.counterPillText,
+                        {
+                          color:
+                            activeServicesCount >= MAX_ACTIVE_SERVICES
+                              ? "#EF4444"
+                              : colors.primary,
+                        },
+                      ]}
+                    >
+                      {activeServicesCount}/{MAX_ACTIVE_SERVICES} activos
+                    </Text>
+                  </View>
+                </View>
+
+                {services.length === 0 && (
+                  <View
+                    style={[
+                      styles.emptyServicesCard,
+                      {
+                        backgroundColor: colors.backgroundElement,
+                        borderColor: isDark ? "#2A3649" : "#E2E8F0",
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="briefcase-outline"
+                      size={36}
+                      color={colors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.emptyServicesTitle,
+                        { color: colors.text },
+                      ]}
+                    >
+                      Sin servicios publicados
+                    </Text>
+                    <Text
+                      style={[
+                        styles.emptyServicesSubtitle,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      Publica tus tarifas y tiempos para que los clientes te contraten directamente sin consultas previas.
+                    </Text>
+                  </View>
+                )}
               </>
             )}
           </View>
@@ -451,14 +578,59 @@ export default function AccountDetailsScreen() {
           isAprobado ? (
             <View style={{ paddingHorizontal: 16 }}>
               <ServiceCard
-                title={item.title}
-                price={item.price}
-                duration={item.duration}
-                imageUrl={item.imageUrl}
+                service={item}
+                onPress={(srv) => setSelectedServiceForDetail(srv)}
+                onEdit={(srv) => {
+                  router.push({
+                    pathname: "/create-service",
+                    params: { serviceId: srv.id },
+                  });
+                }}
+                onTogglePause={async (srv) => {
+                  try {
+                    await toggleServiceStatus(srv.id);
+                  } catch (err: any) {
+                    Alert.alert("Límite de Servicios Activos", err.message);
+                  }
+                }}
+                onDelete={(srv) => {
+                  Alert.alert(
+                    "Eliminar Servicio",
+                    `¿Estás seguro de que deseas eliminar "${srv.titulo_servicio}"? Esta acción no se puede deshacer.`,
+                    [
+                      { text: "Cancelar", style: "cancel" },
+                      {
+                        text: "Eliminar",
+                        style: "destructive",
+                        onPress: async () => {
+                          try {
+                            await deleteService(srv.id);
+                          } catch (err: any) {
+                            Alert.alert("Error", "No se pudo eliminar el servicio.");
+                          }
+                        },
+                      },
+                    ],
+                  );
+                }}
               />
             </View>
           ) : null
         }
+      />
+
+      <ServiceDetailModal
+        visible={Boolean(selectedServiceForDetail)}
+        service={selectedServiceForDetail}
+        isClientView={false}
+        onClose={() => setSelectedServiceForDetail(null)}
+        onEditService={(srv) => {
+          setSelectedServiceForDetail(null);
+          router.push({
+            pathname: "/create-service",
+            params: { serviceId: srv.id },
+          });
+        }}
       />
     </View>
   );
@@ -709,5 +881,44 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "700",
+  },
+  servicesHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 18,
+    marginBottom: 12,
+  },
+  counterPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  counterPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  emptyServicesCard: {
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginBottom: 16,
+  },
+  emptyServicesTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  emptyServicesSubtitle: {
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 18,
   },
 });

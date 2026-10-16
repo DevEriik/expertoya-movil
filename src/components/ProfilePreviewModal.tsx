@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  Alert,
   Image,
   Modal,
   Platform,
@@ -13,6 +14,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
+import ServiceDetailModal from "@/components/ServiceDetailModal";
+import { ServicioPublicadoItem } from "@/types/service";
+import { getServices } from "@/utils/servicesStorage";
 
 interface ProfilePreviewModalProps {
   visible: boolean;
@@ -26,6 +30,7 @@ interface ProfilePreviewModalProps {
   oficiosNombres?: string[];
   calificacion?: number;
   totalReviews?: number;
+  servicios?: ServicioPublicadoItem[];
 }
 
 export default function ProfilePreviewModal({
@@ -40,11 +45,28 @@ export default function ProfilePreviewModal({
   oficiosNombres = [],
   calificacion = 4.9,
   totalReviews = 310,
+  servicios,
 }: ProfilePreviewModalProps) {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
+
+  const [activeServices, setActiveServices] = useState<ServicioPublicadoItem[]>(
+    servicios || [],
+  );
+  const [selectedDetailService, setSelectedDetailService] =
+    useState<ServicioPublicadoItem | null>(null);
+
+  useEffect(() => {
+    if (servicios && servicios.length > 0) {
+      setActiveServices(servicios.filter((s) => s.servicio_activo));
+    } else {
+      getServices().then((list) => {
+        setActiveServices(list.filter((s) => s.servicio_activo));
+      });
+    }
+  }, [servicios, visible]);
 
   const nombreCompleto =
     `${nombre.trim()} ${apellido.trim()}`.trim() || "Tu Nombre";
@@ -274,46 +296,99 @@ export default function ProfilePreviewModal({
               },
             ]}
           >
-            <Text
-              style={[
-                styles.cardTitle,
-                { color: isDark ? "#FDFCF4" : "#283593" },
-              ]}
-            >
-              Servicios Comunes
-            </Text>
-
-            {serviciosComunes.map((servicio, index) => (
-              <View
-                key={servicio.titulo}
+            <View style={styles.sectionHeaderRow}>
+              <Text
                 style={[
-                  styles.serviceRow,
-                  index < serviciosComunes.length - 1 && styles.serviceDivider,
-                  {
-                    borderBottomColor: isDark
-                      ? "rgba(255,255,255,0.06)"
-                      : "rgba(0,0,0,0.06)",
-                  },
+                  styles.cardTitle,
+                  { color: isDark ? "#FDFCF4" : "#283593" },
                 ]}
               >
-                <Text
+                Servicios del Profesional ({activeServices.length})
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: isDark ? "#94A3B8" : "#60646C",
+                  fontWeight: "600",
+                }}
+              >
+                Toca para ver detalle
+              </Text>
+            </View>
+
+            {activeServices.length === 0 ? (
+              <Text
+                style={{
+                  color: isDark ? "#94A3B8" : "#60646C",
+                  fontSize: 13,
+                  marginVertical: 8,
+                }}
+              >
+                El profesional no tiene servicios activos en este momento.
+              </Text>
+            ) : (
+              activeServices.map((servicio, index) => (
+                <TouchableOpacity
+                  key={servicio.id}
                   style={[
-                    styles.serviceTitle,
-                    { color: isDark ? "#CBD5E1" : "#334155" },
+                    styles.serviceRow,
+                    index < activeServices.length - 1 && styles.serviceDivider,
+                    {
+                      borderBottomColor: isDark
+                        ? "rgba(255,255,255,0.06)"
+                        : "rgba(0,0,0,0.06)",
+                    },
                   ]}
+                  onPress={() => setSelectedDetailService(servicio)}
+                  activeOpacity={0.7}
                 >
-                  {servicio.titulo}
-                </Text>
-                <Text
-                  style={[
-                    styles.servicePrice,
-                    { color: isDark ? "#38BDF8" : "#283593" },
-                  ]}
-                >
-                  {servicio.precio}
-                </Text>
-              </View>
-            ))}
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text
+                      style={[
+                        styles.serviceTitle,
+                        { color: isDark ? "#CBD5E1" : "#334155" },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {servicio.titulo_servicio}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: isDark ? "#94A3B8" : "#64748B",
+                        marginTop: 2,
+                      }}
+                    >
+                      ⏱️ {servicio.duracion_estimada}
+                      {servicio.fotos_servicio?.length
+                        ? ` • 📷 ${servicio.fotos_servicio.length} fotos`
+                        : ""}
+                    </Text>
+                  </View>
+
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text
+                      style={[
+                        styles.servicePrice,
+                        { color: isDark ? "#FFB74D" : "#FF8C00" },
+                      ]}
+                    >
+                      ${Number(servicio.costo_estimado).toLocaleString()} ARS
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: isDark ? "#38BDF8" : "#1A73E8",
+                        fontWeight: "700",
+                        marginTop: 2,
+                      }}
+                    >
+                      Ver detalle →
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
 
           <View
@@ -449,6 +524,20 @@ export default function ProfilePreviewModal({
             </TouchableOpacity>
           )}
         </View>
+
+        <ServiceDetailModal
+          visible={Boolean(selectedDetailService)}
+          service={selectedDetailService}
+          isClientView={true}
+          onClose={() => setSelectedDetailService(null)}
+          onBookService={(srv) => {
+            setSelectedDetailService(null);
+            Alert.alert(
+              "Solicitud de Servicio",
+              `Has solicitado el servicio "${srv.titulo_servicio}". El profesional recibirá la notificación con tus datos para coordinar el trabajo.`,
+            );
+          }}
+        />
       </View>
     </Modal>
   );
@@ -645,6 +734,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     marginLeft: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
   },
   reviewsHeaderRow: {
     flexDirection: "row",
