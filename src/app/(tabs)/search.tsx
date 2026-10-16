@@ -4,6 +4,9 @@ import { apiClient } from "@/utils/api";
 import { COVERAGE_MESSAGE, isInCoverageZone } from "@/utils/geoZone";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
+import ProfilePreviewModal from "@/components/ProfilePreviewModal";
+import { ServicioPublicadoItem } from "@/types/service";
+import { getPublicServicesByProfessionalId } from "@/utils/servicesStorage";
 import {
   ActivityIndicator,
   Alert,
@@ -62,6 +65,20 @@ export default function BusquedaScreen() {
   const [precioMin, setPrecioMin] = useState("");
   const [precioMax, setPrecioMax] = useState("");
   const [sortByPriceAsc, setSortByPriceAsc] = useState(false);
+
+  // Estado para visualización del perfil del profesional por parte del cliente
+  const [selectedPro, setSelectedPro] = useState<Profesional | null>(null);
+  const [selectedProServices, setSelectedProServices] = useState<
+    ServicioPublicadoItem[]
+  >([]);
+  const [showProModal, setShowProModal] = useState(false);
+
+  const handleSelectProfesional = async (pro: Profesional) => {
+    setSelectedPro(pro);
+    setShowProModal(true);
+    const srvs = await getPublicServicesByProfessionalId(pro._id);
+    setSelectedProServices(srvs);
+  };
 
   useEffect(() => {
     if (useGPS && coords) {
@@ -142,7 +159,9 @@ export default function BusquedaScreen() {
   };
 
   const renderProfesional = ({ item }: { item: Profesional }) => (
-    <View
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => handleSelectProfesional(item)}
       style={[
         styles.card,
         {
@@ -198,7 +217,7 @@ export default function BusquedaScreen() {
           ${item.tarifaBase}/hora
         </Text>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -612,6 +631,20 @@ export default function BusquedaScreen() {
               </View>
             )
           }
+        />
+      )}
+
+      {selectedPro && (
+        <ProfilePreviewModal
+          visible={showProModal}
+          onClose={() => setShowProModal(false)}
+          nombre={selectedPro.usuario.nombre}
+          apellido={selectedPro.usuario.apellido}
+          fotoPerfil={selectedPro.usuario.fotoPerfil}
+          zonasCobertura={selectedPro.usuario.ubicacion?.direccion}
+          oficiosNombres={selectedPro.profesiones.map((p) => p.nombre)}
+          calificacion={selectedPro.usuario.calificacionPromedio}
+          servicios={selectedProServices}
         />
       )}
     </View>
