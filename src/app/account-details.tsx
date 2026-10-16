@@ -9,6 +9,7 @@ import { useCallback, useState } from "react";
 import {
   FlatList,
   Image,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -168,7 +169,16 @@ export default function AccountDetailsScreen() {
               ]}
             >
               <Image
-                source={{ uri: profile.foto_perfil }}
+                source={{
+                  uri:
+                    profile.foto_perfil &&
+                    !(
+                      Platform.OS === "web" &&
+                      profile.foto_perfil.startsWith("file://")
+                    )
+                      ? profile.foto_perfil
+                      : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
+                }}
                 style={styles.avatar}
               />
               <View style={styles.profileDetails}>
