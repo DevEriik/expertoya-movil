@@ -1,19 +1,24 @@
-// src/components/home/HeroIA.tsx
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Platform,
-} from "react-native";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+// src/components/inicio/HeroIA.tsx
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Platform, StyleSheet, Text, View } from "react-native";
+import { useDiagnosticoIA } from "../../hooks/useDiagnosticoIA";
+import { BuscadorInteractivo } from "./BuscadorInteractivo";
+import { ResultadosIA } from "./ResultadosIA";
 
 export function HeroIA() {
+  const {
+    busqueda,
+    setBusqueda,
+    oficios,
+    isLoading,
+    imagenSeleccionada,
+    seleccionarFoto,
+    quitarFoto,
+    enviarConsulta,
+  } = useDiagnosticoIA();
+
   return (
     <View style={styles.card}>
-      {/* Etiqueta de IA */}
       <View style={styles.badgeContainer}>
         <MaterialCommunityIcons name="magic-staff" size={16} color="#33EFA5" />
         <Text style={styles.badgeText}>
@@ -21,54 +26,29 @@ export function HeroIA() {
         </Text>
       </View>
 
-      {/* Título Principal */}
       <Text style={styles.mainTitle}>
         ¿No estás seguro{"\n"}de a qué{"\n"}especialista{"\n"}llamar?
       </Text>
 
-      {/* Subtítulo */}
       <Text style={styles.subtitle}>
         Describe tu problema o sube una foto/video, y nuestra IA te conectará al
         instante con el experto exacto que necesitas.
       </Text>
 
-      {/* Caja de Búsqueda Interactiva */}
-      <View style={styles.searchContainer}>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Ej., Tengo una pérdida de agua..."
-            placeholderTextColor="#9CA3AF"
-            multiline={true}
-          />
-        </View>
+      <BuscadorInteractivo
+        busqueda={busqueda}
+        setBusqueda={setBusqueda}
+        onCameraPress={seleccionarFoto}
+        onSubmit={enviarConsulta}
+        imagenSeleccionada={imagenSeleccionada}
+        onRemoveImage={quitarFoto}
+      />
 
-        {/* Fila inferior de herramientas e IA */}
-        <View style={styles.toolsRow}>
-          <View style={styles.iconGroup}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Ionicons name="mic-outline" size={24} color="#9CA3AF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Ionicons name="camera-outline" size={24} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity style={styles.aiButton}>
-            <MaterialCommunityIcons
-              name="magic-staff"
-              size={18}
-              color="#121826"
-            />
-            <Text style={styles.aiButtonText}>Preguntar a la IA</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ResultadosIA isLoading={isLoading} oficios={oficios} />
     </View>
   );
 }
 
-// ... (Aquí pegas el StyleSheet que corresponde SÓLO a esta tarjeta)
 const styles = StyleSheet.create({
   card: {
     width: "100%",
@@ -117,55 +97,5 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 32,
     paddingHorizontal: 8,
-  },
-  searchContainer: {
-    width: "100%",
-    backgroundColor: "#121826",
-    borderRadius: 24,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "#374151",
-  },
-  inputRow: {
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-  textInput: {
-    fontSize: 16,
-    color: "#FDFCF4",
-    minHeight: 40,
-  },
-  toolsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 4,
-    paddingBottom: 4,
-  },
-  iconGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  iconButton: {
-    padding: 10,
-    backgroundColor: "#1F2937",
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  aiButton: {
-    flexDirection: "row",
-    backgroundColor: "#33EFA5",
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  aiButtonText: {
-    color: "#121826",
-    fontWeight: "700",
-    fontSize: 15,
-    marginLeft: 8,
   },
 });
