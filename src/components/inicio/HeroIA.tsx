@@ -1,4 +1,3 @@
-// src/components/inicio/HeroIA.tsx
 import React, { useState } from "react";
 import {
   Alert,
@@ -154,10 +153,8 @@ export function HeroIA() {
           />
         </View>
 
-        {/* Fila inferior de herramientas e IA */}
         <View style={styles.toolsRow}>
           <View style={styles.iconGroup}>
-            {/* Botón de micrófono reactivo a Dictado por Voz */}
             <TouchableOpacity
               onPress={handleMicPress}
               accessible={true}

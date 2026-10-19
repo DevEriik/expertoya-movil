@@ -1,8 +1,9 @@
 import React from "react";
 import {
-  View,
-  Text,
+  Platform,
+  ScrollView,
   StyleSheet,
+  Text,
   TouchableOpacity,
   ScrollView,
   Platform,
@@ -12,7 +13,6 @@ import { useTheme } from "@/hooks/use-theme";
 import { useAccessibility } from "@/context/AccessibilityContext";
 import { HeroIA } from "../../components/inicio/HeroIA";
 import { PagosSeguros } from "../../components/inicio/pagosSeguros";
-import { Logo } from "@/components/Logo";
 
 export default function InicioScreen() {
   const colors = useTheme();
@@ -23,7 +23,11 @@ export default function InicioScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.contentContainer}
     >
-      <Logo width={180} height={40} style={{ alignSelf: "flex-start", marginBottom: 16, marginLeft: 4 }} />
+      <Logo
+        width={180}
+        height={40}
+        style={{ alignSelf: "flex-start", marginBottom: 16, marginLeft: 4 }}
+      />
       <HeroIA />
       <PagosSeguros />
       <View style={styles.buttonContainer}>
