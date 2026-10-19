@@ -31,13 +31,13 @@ export default function InicioScreen() {
       <View style={styles.buttonContainer}>
         <Link href="/onboarding" asChild>
           <TouchableOpacity 
-            style={[
+            style={StyleSheet.flatten([
               styles.primaryButton, 
               { 
                 backgroundColor: colors.primary, 
                 shadowColor: colors.primary 
               }
-            ]}
+            ])}
           >
             <Text style={[styles.primaryButtonText, { color: isDark ? "#121826" : "#FFFFFF" }]}>
               Probar Registro de Profesional
