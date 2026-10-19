@@ -3,7 +3,7 @@ import type { Trade } from '../types/onboarding';
 export const TRADES_CATALOG_MOCK: Trade[] = [
     {
         id: 'plumber',
-        name: 'Plomero / Fontanero',
+        name: 'Plomero',
         requiresLicense: false,
     },
     {

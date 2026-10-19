@@ -631,6 +631,27 @@ export default function AccountDetailsScreen() {
             params: { serviceId: srv.id },
           });
         }}
+        onDeleteService={(srv) => {
+          Alert.alert(
+            "Eliminar Servicio",
+            `¿Estás seguro de que deseas eliminar "${srv.titulo_servicio}"? Esta acción no se puede deshacer.`,
+            [
+              { text: "Cancelar", style: "cancel" },
+              {
+                text: "Eliminar",
+                style: "destructive",
+                onPress: async () => {
+                  try {
+                    await deleteService(srv.id);
+                    setSelectedServiceForDetail(null);
+                  } catch (err: any) {
+                    Alert.alert("Error", "No se pudo eliminar el servicio.");
+                  }
+                },
+              },
+            ],
+          );
+        }}
       />
     </View>
   );
