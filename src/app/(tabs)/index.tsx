@@ -1,4 +1,3 @@
-// src/app/(tabs)/index.tsx
 import React from "react";
 import {
   View,
@@ -7,18 +6,17 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
-  useColorScheme,
 } from "react-native";
 import { Link } from "expo-router";
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 import { HeroIA } from "../../components/inicio/HeroIA";
 import { PagosSeguros } from "../../components/inicio/pagosSeguros";
 import { Logo } from "@/components/Logo";
 
 export default function InicioScreen() {
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const colors = useTheme();
+  const { isDarkMode, scaleFont } = useAccessibility();
 
   return (
     <ScrollView
@@ -30,16 +28,16 @@ export default function InicioScreen() {
       <PagosSeguros />
       <View style={styles.buttonContainer}>
         <Link href="/onboarding" asChild>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={StyleSheet.flatten([
-              styles.primaryButton, 
-              { 
-                backgroundColor: colors.primary, 
-                shadowColor: colors.primary 
+              styles.primaryButton,
+              {
+                backgroundColor: colors.primary,
+                shadowColor: colors.primary
               }
             ])}
           >
-            <Text style={[styles.primaryButtonText, { color: isDark ? "#121826" : "#FFFFFF" }]}>
+            <Text style={[styles.primaryButtonText, { color: isDarkMode ? "#121826" : "#FFFFFF", fontSize: scaleFont(16) }]}>
               Probar Registro de Profesional
             </Text>
           </TouchableOpacity>

@@ -10,18 +10,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  useColorScheme,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '@/utils/api';
 import { Logo } from '@/components/Logo';
 
 export default function ForgotPasswordScreen() {
-  const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
-  const colors = Colors[isDark ? 'dark' : 'light'];
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
 
   const router = useRouter();
   const params = useLocalSearchParams<{ email?: string }>();

@@ -1,77 +1,155 @@
-// src/components/home/HeroIA.tsx
-import React from "react";
+// src/components/inicio/HeroIA.tsx
+import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
+  Alert,
   Platform,
-  useColorScheme,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 
 export function HeroIA() {
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const colors = useTheme();
+  const { isDarkMode, highContrast, voiceDictation, scaleFont } =
+    useAccessibility();
+
+  const [promptText, setPromptText] = useState("");
+  const [isListening, setIsListening] = useState(false);
+
+  const handleMicPress = () => {
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    setIsListening(true);
+    Alert.alert(
+      "Dictado por Voz",
+      "Escuchando tu consulta... Di lo que necesitas y lo transcribiremos en el campo.",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+          onPress: () => setIsListening(false),
+        },
+        {
+          text: "Insertar ejemplo",
+          onPress: () => {
+            setPromptText(
+              "Tengo una fuga de agua en el baño y necesito un plomero urgente."
+            );
+            setIsListening(false);
+          },
+        },
+      ]
+    );
+  };
 
   return (
-    <View 
+    <View
       style={[
-        styles.card, 
-        { 
+        styles.card,
+        {
           backgroundColor: colors.backgroundElement,
-          borderColor: colors.backgroundSelected,
-          borderWidth: 1,
-          shadowOpacity: isDark ? 0.35 : 0.08,
-        }
+          borderColor: highContrast ? colors.border : colors.backgroundSelected,
+          borderWidth: highContrast ? 2 : 1,
+          shadowOpacity: isDarkMode ? 0.35 : 0.08,
+        },
       ]}
     >
       {/* Etiqueta de IA */}
-      <View 
+      <View
         style={[
           styles.badgeContainer,
-          { 
-            backgroundColor: isDark ? "rgba(51, 239, 165, 0.12)" : "rgba(0, 191, 165, 0.1)",
-            borderColor: isDark ? "rgba(51, 239, 165, 0.25)" : "rgba(0, 191, 165, 0.2)",
+          {
+            backgroundColor: isDarkMode
+              ? "rgba(51, 239, 165, 0.12)"
+              : "rgba(0, 191, 165, 0.1)",
+            borderColor: isDarkMode
+              ? "rgba(51, 239, 165, 0.25)"
+              : "rgba(0, 191, 165, 0.2)",
             borderWidth: 1,
-          }
+          },
         ]}
       >
-        <MaterialCommunityIcons name="magic-staff" size={16} color={colors.secondary} />
-        <Text style={[styles.badgeText, { color: colors.secondary }]}>
+        <MaterialCommunityIcons
+          name="magic-staff"
+          size={16}
+          color={colors.secondary}
+        />
+        <Text
+          style={[
+            styles.badgeText,
+            { color: colors.secondary, fontSize: scaleFont(13) },
+          ]}
+        >
           Búsqueda con Inteligencia Artificial
         </Text>
       </View>
 
       {/* Título Principal */}
-      <Text style={[styles.mainTitle, { color: colors.text }]}>
+      <Text
+        style={[
+          styles.mainTitle,
+          {
+            color: colors.text,
+            fontSize: scaleFont(34),
+            lineHeight: scaleFont(40),
+          },
+        ]}
+      >
         ¿No estás seguro{"\n"}de a qué{"\n"}especialista{"\n"}llamar?
       </Text>
 
       {/* Subtítulo */}
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+      <Text
+        style={[
+          styles.subtitle,
+          {
+            color: colors.textSecondary,
+            fontSize: scaleFont(15),
+            lineHeight: scaleFont(22),
+          },
+        ]}
+      >
         Describe tu problema o sube una foto/video, y nuestra IA te conectará al
         instante con el experto exacto que necesitas.
       </Text>
 
       {/* Caja de Búsqueda Interactiva */}
-      <View 
+      <View
         style={[
           styles.searchContainer,
-          { 
+          {
             backgroundColor: colors.background,
-            borderColor: colors.backgroundSelected,
-          }
+            borderColor: highContrast
+              ? colors.border
+              : colors.backgroundSelected,
+            borderWidth: highContrast ? 2 : 1,
+          },
         ]}
       >
         <View style={styles.inputRow}>
           <TextInput
-            style={[styles.textInput, { color: colors.text }]}
-            placeholder="Ej., Tengo una pérdida de agua..."
-            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.textInput,
+              { color: colors.text, fontSize: scaleFont(15) },
+            ]}
+            placeholder={
+              isListening
+                ? "Escuchando tu voz..."
+                : "Ej., Tengo una pérdida de agua..."
+            }
+            placeholderTextColor={
+              isListening ? colors.primary : colors.textSecondary
+            }
+            value={promptText}
+            onChangeText={setPromptText}
             multiline={true}
           />
         </View>
@@ -79,46 +157,100 @@ export function HeroIA() {
         {/* Fila inferior de herramientas e IA */}
         <View style={styles.toolsRow}>
           <View style={styles.iconGroup}>
-            <TouchableOpacity 
+            {/* Botón de micrófono reactivo a Dictado por Voz */}
+            <TouchableOpacity
+              onPress={handleMicPress}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Dictado por voz"
+              accessibilityHint="Presiona para dictar tu consulta con la voz"
               style={[
                 styles.iconButton,
-                { 
-                  backgroundColor: colors.backgroundElement,
-                  borderColor: colors.backgroundSelected,
-                  borderWidth: 1,
-                }
+                voiceDictation
+                  ? {
+                      backgroundColor: isListening
+                        ? colors.danger
+                        : isDarkMode
+                        ? "#3A2200"
+                        : "#FEF3E0",
+                      borderColor: colors.primary,
+                      borderWidth: highContrast ? 2.5 : 2,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderRadius: 22,
+                    }
+                  : {
+                      backgroundColor: colors.backgroundElement,
+                      borderColor: colors.backgroundSelected,
+                      borderWidth: 1,
+                    },
               ]}
             >
-              <Ionicons name="mic-outline" size={22} color={colors.textSecondary} />
+              <Ionicons
+                name={
+                  voiceDictation
+                    ? isListening
+                      ? "mic"
+                      : "mic"
+                    : "mic-outline"
+                }
+                size={voiceDictation ? 24 : 22}
+                color={
+                  voiceDictation
+                    ? isListening
+                      ? "#FFFFFF"
+                      : colors.primary
+                    : colors.textSecondary
+                }
+              />
             </TouchableOpacity>
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[
                 styles.iconButton,
-                { 
+                {
                   backgroundColor: colors.backgroundElement,
                   borderColor: colors.backgroundSelected,
                   borderWidth: 1,
-                }
+                },
               ]}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Subir foto o video"
             >
-              <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
+              <Ionicons
+                name="camera-outline"
+                size={22}
+                color={colors.textSecondary}
+              />
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.aiButton,
-              { 
+              {
                 backgroundColor: colors.secondary,
-              }
+              },
             ]}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Preguntar a la IA"
           >
             <MaterialCommunityIcons
               name="magic-staff"
               size={18}
-              color={isDark ? "#121826" : "#FFFFFF"}
+              color={isDarkMode ? "#121826" : "#FFFFFF"}
             />
-            <Text style={[styles.aiButtonText, { color: isDark ? "#121826" : "#FFFFFF" }]}>
+            <Text
+              style={[
+                styles.aiButtonText,
+                {
+                  color: isDarkMode ? "#121826" : "#FFFFFF",
+                  fontSize: scaleFont(14),
+                },
+              ]}
+            >
               Preguntar a la IA
             </Text>
           </TouchableOpacity>
@@ -141,6 +273,9 @@ const styles = StyleSheet.create({
         shadowRadius: 16,
       },
       android: { elevation: 6 },
+      web: {
+        boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+      },
     }),
   },
   badgeContainer: {
@@ -154,20 +289,15 @@ const styles = StyleSheet.create({
   badgeText: {
     fontWeight: "700",
     marginLeft: 8,
-    fontSize: 13,
   },
   mainTitle: {
-    fontSize: 34,
     fontWeight: "800",
     textAlign: "center",
-    lineHeight: 40,
     marginBottom: 16,
   },
   subtitle: {
-    fontSize: 15,
     fontWeight: "400",
     textAlign: "center",
-    lineHeight: 22,
     marginBottom: 28,
     paddingHorizontal: 8,
   },
@@ -175,7 +305,6 @@ const styles = StyleSheet.create({
     width: "100%",
     borderRadius: 24,
     padding: 8,
-    borderWidth: 1,
   },
   inputRow: {
     paddingHorizontal: 12,
@@ -183,7 +312,6 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   textInput: {
-    fontSize: 15,
     minHeight: 40,
   },
   toolsRow: {
@@ -201,6 +329,8 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 20,
     marginRight: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   aiButton: {
     flexDirection: "row",
@@ -212,7 +342,6 @@ const styles = StyleSheet.create({
   },
   aiButtonText: {
     fontWeight: "700",
-    fontSize: 14,
     marginLeft: 8,
   },
 });

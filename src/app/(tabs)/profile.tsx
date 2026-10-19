@@ -1,4 +1,5 @@
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 import { useAuth } from "@/context/AuthContext";
 import { getRoleLabel, isAdmin } from "@/utils/roles";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,24 +9,21 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SettingsScreen() {
-  const scheme = useColorScheme();
   const router = useRouter();
   const { logout, usuario } = useAuth();
   const insets = useSafeAreaInsets();
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
 
   const handleLogout = async () => {
     await logout();
     router.replace("/login");
   };
-
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
 
   const admin = isAdmin(usuario?.rol);
 

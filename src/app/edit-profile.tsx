@@ -13,7 +13,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 
@@ -25,7 +24,8 @@ import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ProfilePreviewModal from "@/components/ProfilePreviewModal";
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 import { useAuth } from "@/context/AuthContext";
 import { apiClient } from "@/utils/api";
 import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
@@ -77,9 +77,8 @@ const getSafeAvatarUri = (uri?: string | null) => {
 export default function EditProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[scheme === "unspecified" ? "light" : scheme];
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
   const { usuario, login } = useAuth();
 
   const admin = isAdmin(usuario?.rol);
@@ -1031,7 +1030,7 @@ export default function EditProfileScreen() {
                   {
                     borderColor: colors.primary,
                     backgroundColor:
-                      scheme === "dark"
+                      isDark
                         ? "rgba(255, 140, 0, 0.12)"
                         : "rgba(255, 140, 0, 0.08)",
                   },
