@@ -1,17 +1,20 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useColorScheme } from "react-native";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import {
+  AccessibilityProvider,
+  useAccessibility,
+} from "@/context/AccessibilityContext";
+import { AuthProvider } from "@/context/AuthContext";
 
 SplashScreen.preventAutoHideAsync();
 
-import { AuthProvider } from "@/context/AuthContext";
+function RootNavigation() {
+  const { isDarkMode } = useAccessibility();
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={isDarkMode ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
       <AuthProvider>
         <Stack screenOptions={{ headerShown: false }}>
@@ -50,8 +53,24 @@ export default function RootLayout() {
               headerShown: false,
             }}
           />
+          <Stack.Screen
+            name="accessibility"
+            options={{
+              title: "Centro de Accesibilidad",
+              headerShown: false,
+              animation: "slide_from_right",
+            }}
+          />
         </Stack>
       </AuthProvider>
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AccessibilityProvider>
+      <RootNavigation />
+    </AccessibilityProvider>
   );
 }

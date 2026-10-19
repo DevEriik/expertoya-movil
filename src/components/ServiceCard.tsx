@@ -4,11 +4,11 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 import { ServicioPublicadoItem } from "@/types/service";
 
 export interface ServiceCardProps {
@@ -42,9 +42,8 @@ export default function ServiceCard({
   onTogglePause,
   onDelete,
 }: ServiceCardProps) {
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
 
   // Normalizar datos si se pasa el objeto `service` completo o props individuales
   const currentItem: ServicioPublicadoItem = service ?? {

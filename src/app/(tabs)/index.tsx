@@ -1,23 +1,22 @@
-// src/app/(tabs)/index.tsx
-import { Logo } from "@/components/Logo";
-import { Colors } from "@/constants/theme";
-import { Link } from "expo-router";
+import React from "react";
 import {
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
-  View,
+  ScrollView,
+  Platform,
 } from "react-native";
+import { Link } from "expo-router";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 import { HeroIA } from "../../components/inicio/HeroIA";
 import { PagosSeguros } from "../../components/inicio/pagosSeguros";
 
 export default function InicioScreen() {
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const colors = useTheme();
+  const { isDarkMode, scaleFont } = useAccessibility();
 
   return (
     <ScrollView
@@ -38,16 +37,11 @@ export default function InicioScreen() {
               styles.primaryButton,
               {
                 backgroundColor: colors.primary,
-                shadowColor: colors.primary,
-              },
+                shadowColor: colors.primary
+              }
             ])}
           >
-            <Text
-              style={[
-                styles.primaryButtonText,
-                { color: isDark ? "#121826" : "#FFFFFF" },
-              ]}
-            >
+            <Text style={[styles.primaryButtonText, { color: isDarkMode ? "#121826" : "#FFFFFF", fontSize: scaleFont(16) }]}>
               Probar Registro de Profesional
             </Text>
           </TouchableOpacity>

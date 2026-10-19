@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, useColorScheme } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -10,9 +11,8 @@ import { apiClient } from '@/utils/api';
 import { Logo } from '@/components/Logo';
 
 export default function RegisterScreen() {
-    const scheme = useColorScheme();
-    const isDark = scheme === 'dark';
-    const colors = Colors[isDark ? 'dark' : 'light'];
+    const colors = useTheme();
+    const { isDarkMode: isDark } = useAccessibility();
 
     const router = useRouter();
     const { login } = useAuth();

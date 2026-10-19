@@ -11,10 +11,11 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 
 const CustomSwitch = ({
   value,
@@ -74,9 +75,9 @@ const CustomSwitch = ({
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
   const { usuario } = useAuth();
-  const colors = Colors[scheme === "dark" ? "dark" : "light"];
 
   const [messages, setMessages] = useState(true);
   const [escrowAlerts, setEscrowAlerts] = useState(true);

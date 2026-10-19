@@ -6,13 +6,13 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 import { ServicioPublicadoItem } from "@/types/service";
 
 interface ServiceDetailModalProps {
@@ -35,9 +35,8 @@ export default function ServiceDetailModal({
   onDeleteService,
 }: ServiceDetailModalProps) {
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
 
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
   const [imgError, setImgError] = useState(false);

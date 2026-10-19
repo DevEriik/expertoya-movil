@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
-  useColorScheme,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { CLIENT_CHATS, PRO_CHATS } from '@/constants/mockChatData';
 import type { ChatSession, UserRole } from '@/types/chat';
 import { MessagesList } from '@/components/chat/MessagesList';
@@ -15,10 +15,8 @@ import { useAuth } from '@/context/AuthContext';
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   
-  // Detección automática del tema según la configuración del sistema del celular
-  const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
-  const colors = Colors[isDark ? 'dark' : 'light'];
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
 
   // Detección automática del rol según el usuario autenticado
   const { usuario } = useAuth();

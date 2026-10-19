@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import type { DocumentSlot } from '../../types/onboarding';
 
 interface DocumentUploadCardProps {
@@ -24,7 +25,7 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
     onPickFile,
     onRemove,
 }) => {
-    const isDark = useColorScheme() === 'dark';
+    const { isDarkMode: isDark } = useAccessibility();
     const isSuccess = slot.status === 'valid';
     const isError = slot.status === 'invalid';
     const isPdf = slot.fileName?.toLowerCase().endsWith('.pdf') || slot.mimeType === 'application/pdf';

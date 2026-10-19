@@ -1,13 +1,12 @@
-// src/components/home/PagosSeguros.tsx
 import React from "react";
-import { View, Text, StyleSheet, Platform, useColorScheme } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 
 export function PagosSeguros() {
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const colors = useTheme();
+  const { isDarkMode, highContrast, scaleFont } = useAccessibility();
 
   return (
     <View 
@@ -15,9 +14,9 @@ export function PagosSeguros() {
         styles.card, 
         { 
           backgroundColor: colors.backgroundElement,
-          borderColor: colors.backgroundSelected,
-          borderWidth: 1,
-          shadowOpacity: isDark ? 0.35 : 0.08,
+          borderColor: highContrast ? colors.border : colors.backgroundSelected,
+          borderWidth: highContrast ? 2 : 1,
+          shadowOpacity: isDarkMode ? 0.35 : 0.08,
         }
       ]}
     >
@@ -28,7 +27,7 @@ export function PagosSeguros() {
             styles.badgeContainer,
             { 
               backgroundColor: colors.background,
-              borderColor: isDark ? "rgba(51, 239, 165, 0.25)" : "rgba(0, 191, 165, 0.2)",
+              borderColor: isDarkMode ? "rgba(51, 239, 165, 0.25)" : "rgba(0, 191, 165, 0.2)",
             }
           ]}
         >
@@ -37,17 +36,17 @@ export function PagosSeguros() {
             size={16}
             color={colors.secondary}
           />
-          <Text style={[styles.badgeText, { color: colors.secondary }]}>Pagos 100% Seguros</Text>
+          <Text style={[styles.badgeText, { color: colors.secondary, fontSize: scaleFont(13) }]}>Pagos 100% Seguros</Text>
         </View>
       </View>
 
       {/* Título Principal */}
-      <Text style={[styles.mainTitle, { color: colors.text }]}>
+      <Text style={[styles.mainTitle, { color: colors.text, fontSize: scaleFont(26), lineHeight: scaleFont(32) }]}>
         Tu dinero está protegido hasta que el trabajo esté terminado
       </Text>
 
       {/* Descripción */}
-      <Text style={[styles.description, { color: colors.textSecondary }]}>
+      <Text style={[styles.description, { color: colors.textSecondary, fontSize: scaleFont(15), lineHeight: scaleFont(22) }]}>
         Con nuestro sistema de{" "}
         <Text style={[styles.highlightText, { color: colors.text }]}>Retención Segura (Escrow)</Text>, tu
         pago se guarda de forma neutral. El profesional solo recibe el dinero
@@ -62,14 +61,14 @@ export function PagosSeguros() {
               styles.iconBox,
               { 
                 backgroundColor: colors.background,
-                borderColor: colors.backgroundSelected,
+                borderColor: highContrast ? colors.border : colors.backgroundSelected,
                 borderWidth: 1,
               },
             ]}
           >
             <Ionicons name="wallet-outline" size={22} color={colors.primary} />
           </View>
-          <Text style={[styles.featureText, { color: colors.text }]}>
+          <Text style={[styles.featureText, { color: colors.text, fontSize: scaleFont(14) }]}>
             Pagas al contratar, pero el dinero se retiene.
           </Text>
         </View>
@@ -80,7 +79,7 @@ export function PagosSeguros() {
               styles.iconBox,
               { 
                 backgroundColor: colors.background,
-                borderColor: colors.backgroundSelected,
+                borderColor: highContrast ? colors.border : colors.backgroundSelected,
                 borderWidth: 1,
               },
             ]}
@@ -91,7 +90,7 @@ export function PagosSeguros() {
               color={colors.secondary}
             />
           </View>
-          <Text style={[styles.featureText, { color: colors.text }]}>
+          <Text style={[styles.featureText, { color: colors.text, fontSize: scaleFont(14) }]}>
             Garantía de satisfacción o devolución garantizada.
           </Text>
         </View>
@@ -103,7 +102,8 @@ export function PagosSeguros() {
           styles.innerCard,
           { 
             backgroundColor: colors.background,
-            borderColor: colors.backgroundSelected,
+            borderColor: highContrast ? colors.border : colors.backgroundSelected,
+            borderWidth: highContrast ? 2 : 1,
           }
         ]}
       >
@@ -111,14 +111,14 @@ export function PagosSeguros() {
           style={[
             styles.lockCircle,
             { 
-              backgroundColor: isDark ? "rgba(51, 239, 165, 0.12)" : "rgba(0, 191, 165, 0.1)",
+              backgroundColor: isDarkMode ? "rgba(51, 239, 165, 0.12)" : "rgba(0, 191, 165, 0.1)",
             }
           ]}
         >
           <Ionicons name="lock-closed-outline" size={32} color={colors.secondary} />
         </View>
-        <Text style={[styles.innerTitle, { color: colors.text }]}>Fondos Retenidos</Text>
-        <Text style={[styles.innerText, { color: colors.textSecondary }]}>
+        <Text style={[styles.innerTitle, { color: colors.text, fontSize: scaleFont(18) }]}>Fondos Retenidos</Text>
+        <Text style={[styles.innerText, { color: colors.textSecondary, fontSize: scaleFont(14), lineHeight: scaleFont(20) }]}>
           El pago se libera al profesional{" "}
           <Text style={[styles.highlightTeal, { color: colors.secondary }]}>solo con tu aprobación</Text>{" "}
           final.

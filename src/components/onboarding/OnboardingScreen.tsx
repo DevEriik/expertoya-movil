@@ -10,9 +10,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  useColorScheme,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAccessibility } from "@/context/AccessibilityContext";
 
 import { useOnboarding } from "../../hooks/useOnboarding";
 import { getToken } from "../../utils/secureStore";
@@ -23,9 +23,7 @@ import { StepIndicator } from "./StepIndicator";
 export const OnboardingScreen: React.FC = () => {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { isDarkMode: isDark } = useAccessibility();
 
   const {
     state,

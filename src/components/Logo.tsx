@@ -1,6 +1,7 @@
 import React from 'react';
-import { useColorScheme, StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleSheet, View, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
+import { useAccessibility } from '@/context/AccessibilityContext';
 
 const logoLight = require('@/assets/images/logos/logo-expertoya-light.svg');
 const logoDark = require('@/assets/images/logos/logo-expertoya-dark.svg');
@@ -12,8 +13,7 @@ interface LogoProps {
 }
 
 export const Logo: React.FC<LogoProps> = ({ width = 180, height = 40, style }) => {
-  const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
+  const { isDarkMode: isDark } = useAccessibility();
 
   return (
     <View style={[styles.container, { width, height }, style]}>

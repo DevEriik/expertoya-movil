@@ -8,12 +8,12 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 import ServiceDetailModal from "@/components/ServiceDetailModal";
 import { ServicioPublicadoItem } from "@/types/service";
 import { getServices } from "@/utils/servicesStorage";
@@ -48,9 +48,8 @@ export default function ProfilePreviewModal({
   servicios,
 }: ProfilePreviewModalProps) {
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
 
   const [activeServices, setActiveServices] = useState<ServicioPublicadoItem[]>(
     servicios || [],

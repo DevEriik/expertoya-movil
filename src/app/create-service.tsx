@@ -11,7 +11,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -20,7 +19,8 @@ import { BlurView } from "expo-blur";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 import { OficioOption } from "@/types/service";
 import { apiClient } from "@/utils/api";
 import {
@@ -58,9 +58,8 @@ const SUGGESTED_DURATIONS = [
 export default function CreateServiceModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
 
   const params = useLocalSearchParams<{ serviceId?: string }>();
   const isEditing = Boolean(params.serviceId);

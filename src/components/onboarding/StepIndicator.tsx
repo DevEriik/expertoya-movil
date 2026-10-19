@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAccessibility } from '@/context/AccessibilityContext';
 
 interface StepIndicatorProps {
     currentStep: number;
@@ -13,7 +14,7 @@ const STEPS = [
 ];
 
 export const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
-    const isDark = useColorScheme() === 'dark';
+    const { isDarkMode: isDark } = useAccessibility();
 
     return (
         <View style={styles.container}>

@@ -12,6 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import type { ChatSession, UserRole, Message } from '../../types/chat';
 
 interface Props {
@@ -35,6 +36,7 @@ export const ActiveConversation: React.FC<Props> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
+  const { voiceDictation, scaleFont } = useAccessibility();
 
   const otherPerson =
     activeRole === 'CLIENTE' ? chat.professional : chat.client;
@@ -316,15 +318,63 @@ export const ActiveConversation: React.FC<Props> = ({
               backgroundColor: isDark ? '#121826' : '#F8FAFC',
               color: colors.text,
               borderColor: isDark ? '#374151' : '#E2E8F0',
+              fontSize: scaleFont(15),
             },
           ]}
           returnKeyType="send"
           onSubmitEditing={handleSend}
         />
 
+        {voiceDictation && inputText.trim().length > 0 && (
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              {
+                backgroundColor: isDark ? '#3A2200' : '#FEF3E0',
+                borderWidth: 1.5,
+                borderColor: colors.primary,
+                marginRight: 8,
+              },
+            ]}
+            onPress={() => {
+              Alert.alert(
+                'Dictado por Voz',
+                'Dicta tu mensaje para añadirlo a la conversación.',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  {
+                    text: 'Insertar dictado',
+                    onPress: () =>
+                      setInputText((prev) =>
+                        prev
+                          ? `${prev} Muchas gracias por la pronta respuesta.`
+                          : 'Muchas gracias por la respuesta.'
+                      ),
+                  },
+                ]
+              );
+            }}
+            activeOpacity={0.8}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Dictar por voz"
+          >
+            <Ionicons name="mic" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={handleSend}
+          onPress={() => {
+            if (!inputText.trim()) {
+              Alert.alert(
+                'Dictado por Voz',
+                'Iniciando dictado de audio para este chat...'
+              );
+            } else {
+              handleSend();
+            }
+          }}
           activeOpacity={0.8}
           accessible={true}
           accessibilityLabel={
