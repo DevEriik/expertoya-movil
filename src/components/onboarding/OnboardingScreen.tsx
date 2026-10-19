@@ -10,6 +10,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -22,6 +23,9 @@ import { StepIndicator } from "./StepIndicator";
 export const OnboardingScreen: React.FC = () => {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
   const {
     state,
@@ -102,7 +106,6 @@ export const OnboardingScreen: React.FC = () => {
         });
 
         const response = uploadFormData;
-
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
@@ -136,9 +139,21 @@ export const OnboardingScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.topBar}>
+    <SafeAreaView
+      className="flex-1 bg-[#FDFCF4] dark:bg-[#121826]"
+      style={[
+        styles.safeArea,
+        { backgroundColor: isDark ? "#121826" : "#FDFCF4" },
+      ]}
+    >
+      <View
+        className="flex-1 px-4 bg-[#FDFCF4] dark:bg-[#121826]"
+        style={[
+          styles.container,
+          { backgroundColor: isDark ? "#121826" : "#FDFCF4" },
+        ]}
+      >
+        <View className="flex-row items-center justify-between py-2" style={styles.topBar}>
           <TouchableOpacity
             onPress={() => {
               if (state.currentStep > 1) {
@@ -147,25 +162,51 @@ export const OnboardingScreen: React.FC = () => {
                 router.back();
               }
             }}
+            className="p-2 -ml-2 rounded-full active:opacity-70"
             style={styles.backButton}
+            accessibilityLabel="Volver"
           >
-            <Ionicons name="arrow-back" size={22} color="#283593" />
+            <Ionicons
+              name="arrow-back"
+              size={22}
+              color={isDark ? "#FFB74D" : "#283593"}
+            />
           </TouchableOpacity>
 
-          <Text style={styles.stepText}>Paso {state.currentStep} de 3</Text>
+          <Text
+            className="text-xs font-bold text-[#94A3B8] dark:text-[#94A3B8]"
+            style={[styles.stepText, { color: isDark ? "#94A3B8" : "#94A3B8" }]}
+          >
+            Paso {state.currentStep} de 3
+          </Text>
         </View>
 
         <StepIndicator currentStep={state.currentStep} />
 
         <ScrollView
+          className="flex-1"
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
           {state.currentStep === 1 && (
             <View>
-              <Text style={styles.sectionTitle}>Validación de Identidad</Text>
-              <Text style={styles.sectionSubtitle}>
+              <Text
+                className="text-xl font-extrabold text-[#283593] dark:text-[#FDFCF4] mb-1"
+                style={[
+                  styles.sectionTitle,
+                  { color: isDark ? "#FDFCF4" : "#283593" },
+                ]}
+              >
+                Validación de Identidad
+              </Text>
+              <Text
+                className="text-[13px] text-[#64748B] dark:text-[#94A3B8] leading-[18px] mb-4"
+                style={[
+                  styles.sectionSubtitle,
+                  { color: isDark ? "#94A3B8" : "#64748B" },
+                ]}
+              >
                 Para garantizar la seguridad de los clientes en ExpertoYa, todos
                 los profesionales deben validar su identidad y antecedentes.
               </Text>
@@ -278,14 +319,28 @@ export const OnboardingScreen: React.FC = () => {
 
           {state.currentStep === 2 && (
             <View>
-              <Text style={styles.sectionTitle}>Oficios y Especialidades</Text>
-              <Text style={styles.sectionSubtitle}>
+              <Text
+                className="text-xl font-extrabold text-[#283593] dark:text-[#FDFCF4] mb-1"
+                style={[
+                  styles.sectionTitle,
+                  { color: isDark ? "#FDFCF4" : "#283593" },
+                ]}
+              >
+                Oficios y Especialidades
+              </Text>
+              <Text
+                className="text-[13px] text-[#64748B] dark:text-[#94A3B8] leading-[18px] mb-4"
+                style={[
+                  styles.sectionSubtitle,
+                  { color: isDark ? "#94A3B8" : "#64748B" },
+                ]}
+              >
                 Selecciona los oficios que realizas. Si alguno exige matrícula
                 legal habilitante, te solicitaremos la documentación
                 correspondiente.
               </Text>
 
-              <View style={styles.tradesList}>
+              <View className="gap-2.5 mb-5" style={styles.tradesList}>
                 {tradesCatalog.map((trade) => {
                   const isSelected = state.trades.selectedTradeIds.includes(
                     trade.id,
@@ -298,50 +353,124 @@ export const OnboardingScreen: React.FC = () => {
                       onPress={() =>
                         toggleTrade(trade.id, trade.requiresLicense)
                       }
+                      className={`border-[1.5px] rounded-[14px] p-3.5 mb-2.5 ${isSelected
+                          ? "bg-[#EEF2FF] dark:bg-[#1E293B] border-[#283593] dark:border-[#33EFA5]"
+                          : "bg-white dark:bg-[#1F2937] border-[#E2E8F0] dark:border-[#374151]"
+                        }`}
                       style={[
                         styles.tradeCard,
-                        isSelected && styles.tradeCardSelected,
+                        {
+                          backgroundColor: isSelected
+                            ? isDark
+                              ? "#1E293B"
+                              : "#EEF2FF"
+                            : isDark
+                              ? "#1F2937"
+                              : "#FFFFFF",
+                          borderColor: isSelected
+                            ? isDark
+                              ? "#33EFA5"
+                              : "#283593"
+                            : isDark
+                              ? "#374151"
+                              : "#E2E8F0",
+                        },
                       ]}
                     >
-                      <View style={styles.tradeCardHeader}>
+                      <View className="flex-row items-center" style={styles.tradeCardHeader}>
                         <View
+                          className={`w-[22px] h-[22px] rounded-md border-2 items-center justify-center ${isSelected
+                              ? "bg-[#283593] dark:bg-[#33EFA5] border-[#283593] dark:border-[#33EFA5]"
+                              : "bg-white dark:bg-[#1F2937] border-[#94A3B8] dark:border-[#6B7280]"
+                            }`}
                           style={[
                             styles.checkbox,
-                            isSelected && styles.checkboxSelected,
+                            {
+                              backgroundColor: isSelected
+                                ? isDark
+                                  ? "#33EFA5"
+                                  : "#283593"
+                                : isDark
+                                  ? "#1F2937"
+                                  : "#FFFFFF",
+                              borderColor: isSelected
+                                ? isDark
+                                  ? "#33EFA5"
+                                  : "#283593"
+                                : isDark
+                                  ? "#6B7280"
+                                  : "#94A3B8",
+                            },
                           ]}
                         >
                           {isSelected && (
                             <Ionicons
                               name="checkmark"
                               size={16}
-                              color="#FFFFFF"
+                              color={isDark ? "#121826" : "#FFFFFF"}
                             />
                           )}
                         </View>
 
                         <View style={{ flex: 1, marginLeft: 12 }}>
                           <Text
+                            className={`text-[15px] font-bold ${isSelected
+                                ? "text-[#283593] dark:text-[#33EFA5]"
+                                : "text-[#334155] dark:text-[#F3F4F6]"
+                              }`}
                             style={[
                               styles.tradeName,
-                              isSelected && styles.tradeNameSelected,
+                              {
+                                color: isSelected
+                                  ? isDark
+                                    ? "#33EFA5"
+                                    : "#283593"
+                                  : isDark
+                                    ? "#F3F4F6"
+                                    : "#334155",
+                              },
                             ]}
                           >
                             {trade.name}
                           </Text>
 
                           {trade.requiresLicense ? (
-                            <View style={styles.regulatedBadge}>
+                            <View
+                              className="flex-row items-center bg-[#FFEDD5] dark:bg-[#451A03] py-0.5 px-2 rounded-lg self-start mt-1 gap-1"
+                              style={[
+                                styles.regulatedBadge,
+                                {
+                                  backgroundColor: isDark
+                                    ? "#451A03"
+                                    : "#FFEDD5",
+                                },
+                              ]}
+                            >
                               <Ionicons
                                 name="shield-checkmark-outline"
                                 size={12}
-                                color="#EA580C"
+                                color={isDark ? "#FFB74D" : "#EA580C"}
                               />
-                              <Text style={styles.regulatedBadgeText}>
+                              <Text
+                                className="text-[11px] font-bold text-[#EA580C] dark:text-[#FFB74D]"
+                                style={[
+                                  styles.regulatedBadgeText,
+                                  {
+                                    color: isDark ? "#FFB74D" : "#EA580C",
+                                  },
+                                ]}
+                              >
                                 Exige Matrícula Oficial
                               </Text>
                             </View>
                           ) : (
-                            <Text style={styles.freeBadgeText}>
+                            <Text
+                              className="text-[11px] text-[#94A3B8] dark:text-[#94A3B8] mt-0.5"
+                              style={[
+                                styles.freeBadgeText,
+                                { color: isDark ? "#94A3B8" : "#94A3B8" },
+                              ]}
+                            >
                               Oficio libre de matrícula
                             </Text>
                           )}
@@ -351,6 +480,7 @@ export const OnboardingScreen: React.FC = () => {
                   );
                 })}
               </View>
+
               {(() => {
                 const selectedRegulatedTrades = tradesCatalog.filter(
                   (t) =>
@@ -363,13 +493,30 @@ export const OnboardingScreen: React.FC = () => {
                   state.trades.selectedTradeIds.length > 0
                 ) {
                   return (
-                    <View style={styles.noLicensesNotice}>
+                    <View
+                      className="flex-row items-center bg-[#D1FAE5] dark:bg-[#064E3B]/60 border border-[#A7F3D0] dark:border-[#047857] p-3.5 rounded-[14px] gap-2.5 mt-2.5"
+                      style={[
+                        styles.noLicensesNotice,
+                        {
+                          backgroundColor: isDark
+                            ? "rgba(6, 78, 59, 0.5)"
+                            : "#D1FAE5",
+                          borderColor: isDark ? "#047857" : "#A7F3D0",
+                        },
+                      ]}
+                    >
                       <Ionicons
                         name="checkmark-circle-outline"
                         size={22}
-                        color="#059669"
+                        color={isDark ? "#33EFA5" : "#059669"}
                       />
-                      <Text style={styles.noLicensesNoticeText}>
+                      <Text
+                        className="text-[13px] font-semibold text-[#065F46] dark:text-[#33EFA5] flex-1"
+                        style={[
+                          styles.noLicensesNoticeText,
+                          { color: isDark ? "#33EFA5" : "#065F46" },
+                        ]}
+                      >
                         Los oficios seleccionados no requieren matrícula
                         habilitante. ¡Puedes continuar al siguiente paso!
                       </Text>
@@ -379,18 +526,30 @@ export const OnboardingScreen: React.FC = () => {
 
                 if (selectedRegulatedTrades.length > 0) {
                   return (
-                    <View style={styles.licensesContainer}>
-                      <View style={styles.licensesHeader}>
+                    <View className="mt-2.5" style={styles.licensesContainer}>
+                      <View className="flex-row items-center gap-2 mb-1" style={styles.licensesHeader}>
                         <Ionicons
                           name="warning-outline"
                           size={20}
-                          color="#EA580C"
+                          color={isDark ? "#FFB74D" : "#EA580C"}
                         />
-                        <Text style={styles.licensesTitle}>
+                        <Text
+                          className="text-base font-extrabold text-[#283593] dark:text-[#FDFCF4]"
+                          style={[
+                            styles.licensesTitle,
+                            { color: isDark ? "#FDFCF4" : "#283593" },
+                          ]}
+                        >
                           Matrículas Obligatorias por Ley
                         </Text>
                       </View>
-                      <Text style={styles.licensesSubtitle}>
+                      <Text
+                        className="text-xs text-[#64748B] dark:text-[#94A3B8] mb-3.5"
+                        style={[
+                          styles.licensesSubtitle,
+                          { color: isDark ? "#94A3B8" : "#64748B" },
+                        ]}
+                      >
                         La ley exige verificar tu carnet o matrícula vigente
                         para ejercer estos oficios en la plataforma:
                       </Text>
@@ -453,33 +612,71 @@ export const OnboardingScreen: React.FC = () => {
 
           {state.currentStep === 3 && (
             <View>
-              <Text style={styles.sectionTitle}>Situación Fiscal</Text>
-              <Text style={styles.sectionSubtitle}>
+              <Text
+                className="text-xl font-extrabold text-[#283593] dark:text-[#FDFCF4] mb-1"
+                style={[
+                  styles.sectionTitle,
+                  { color: isDark ? "#FDFCF4" : "#283593" },
+                ]}
+              >
+                Situación Fiscal
+              </Text>
+              <Text
+                className="text-[13px] text-[#64748B] dark:text-[#94A3B8] leading-[18px] mb-4"
+                style={[
+                  styles.sectionSubtitle,
+                  { color: isDark ? "#94A3B8" : "#64748B" },
+                ]}
+              >
                 ExpertoYa procesa y transfiere los pagos de tus servicios. Para
                 cumplir con la normativa fiscal y evitar retenciones
                 adicionales, completa tus datos:
               </Text>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Número de CUIT / CUIL</Text>
-                <View style={styles.inputContainer}>
+              <View className="mt-2 mb-3" style={styles.inputGroup}>
+                <Text
+                  className="text-sm font-bold text-[#283593] dark:text-[#FDFCF4] mb-1.5"
+                  style={[
+                    styles.inputLabel,
+                    { color: isDark ? "#FDFCF4" : "#283593" },
+                  ]}
+                >
+                  Número de CUIT / CUIL
+                </Text>
+                <View
+                  className="flex-row items-center bg-white dark:bg-[#1F2937] border-[1.5px] border-[#CBD5E1] dark:border-[#374151] rounded-[14px] px-3.5 py-3"
+                  style={[
+                    styles.inputContainer,
+                    {
+                      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+                      borderColor: isDark ? "#374151" : "#CBD5E1",
+                    },
+                  ]}
+                >
                   <Ionicons
                     name="card-outline"
                     size={20}
-                    color="#283593"
+                    color={isDark ? "#33EFA5" : "#283593"}
                     style={{ marginRight: 8 }}
                   />
                   <TextInput
                     value={state.fiscal.cuit}
                     onChangeText={setCuit}
                     placeholder="Ej: 20-12345678-9 (sin guiones)"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
                     keyboardType="numeric"
                     maxLength={11}
-                    style={styles.textInput}
+                    className="flex-1 text-[15px] font-semibold text-[#1E293B] dark:text-[#F9FAFB]"
+                    style={[
+                      styles.textInput,
+                      { color: isDark ? "#F9FAFB" : "#1E293B" },
+                    ]}
                   />
                 </View>
-                <Text style={styles.inputHelper}>
+                <Text
+                  className="text-[11px] text-[#94A3B8] dark:text-[#94A3B8] mt-1 ml-0.5"
+                  style={[styles.inputHelper, { color: isDark ? "#94A3B8" : "#94A3B8" }]}
+                >
                   Ingresa los 11 dígitos de tu CUIT/CUIL.
                 </Text>
               </View>
@@ -511,13 +708,28 @@ export const OnboardingScreen: React.FC = () => {
                 />
               </View>
 
-              <View style={styles.securityNotice}>
+              <View
+                className="flex-row items-center bg-[#EEF2FF] dark:bg-[#1F2937] border border-[#C7D2FE] dark:border-[#374151] p-3 rounded-xl gap-2.5 mt-2"
+                style={[
+                  styles.securityNotice,
+                  {
+                    backgroundColor: isDark ? "#1F2937" : "#EEF2FF",
+                    borderColor: isDark ? "#374151" : "#C7D2FE",
+                  },
+                ]}
+              >
                 <Ionicons
                   name="lock-closed-outline"
                   size={18}
-                  color="#283593"
+                  color={isDark ? "#33EFA5" : "#283593"}
                 />
-                <Text style={styles.securityNoticeText}>
+                <Text
+                  className="text-xs text-[#3730A3] dark:text-[#94A3B8] flex-1 leading-4"
+                  style={[
+                    styles.securityNoticeText,
+                    { color: isDark ? "#94A3B8" : "#3730A3" },
+                  ]}
+                >
                   Tus datos fiscales están protegidos con cifrado y solo serán
                   utilizados para la facturación y transferencias bancarias de
                   tus trabajos.
@@ -527,24 +739,61 @@ export const OnboardingScreen: React.FC = () => {
           )}
         </ScrollView>
 
-        <View style={styles.footer}>
+        {/* Footer y Botón de Acción Principal */}
+        <View
+          className="py-3 bg-[#FDFCF4] dark:bg-[#121826]"
+          style={[
+            styles.footer,
+            { backgroundColor: isDark ? "#121826" : "#FDFCF4" },
+          ]}
+        >
           <TouchableOpacity
             onPress={handlePrimaryAction}
             disabled={!canAdvance || isSubmitting}
             activeOpacity={0.8}
+            className={`py-4 rounded-2xl flex-row items-center justify-center gap-2 ${!canAdvance || isSubmitting
+                ? "bg-[#E2E8F0] dark:bg-[#374151]"
+                : "bg-[#FF8C00] dark:bg-[#FFB74D] shadow-md shadow-[#FF8C00]/30 dark:shadow-none"
+              }`}
             style={[
               styles.primaryButton,
               (!canAdvance || isSubmitting) && styles.primaryButtonDisabled,
+              {
+                backgroundColor:
+                  !canAdvance || isSubmitting
+                    ? isDark
+                      ? "#374151"
+                      : "#E2E8F0"
+                    : isDark
+                      ? "#FFB74D"
+                      : "#FF8C00",
+                shadowColor: isDark ? "#FFB74D" : "#FF8C00",
+              },
             ]}
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <ActivityIndicator
+                color={isDark && canAdvance ? "#121826" : "#FFFFFF"}
+                size="small"
+              />
             ) : (
               <>
                 <Text
+                  className={`text-[15px] font-bold ${!canAdvance
+                      ? "text-[#94A3B8] dark:text-[#6B7280]"
+                      : "text-white dark:text-[#121826]"
+                    }`}
                   style={[
                     styles.primaryButtonText,
-                    !canAdvance && styles.primaryButtonTextDisabled,
+                    {
+                      color: !canAdvance
+                        ? isDark
+                          ? "#6B7280"
+                          : "#94A3B8"
+                        : isDark
+                          ? "#121826"
+                          : "#FFFFFF",
+                    },
                   ]}
                 >
                   {state.currentStep === 3
@@ -554,7 +803,15 @@ export const OnboardingScreen: React.FC = () => {
                 <Ionicons
                   name="arrow-forward"
                   size={18}
-                  color={canAdvance ? "#FFFFFF" : "#94A3B8"}
+                  color={
+                    canAdvance
+                      ? isDark
+                        ? "#121826"
+                        : "#FFFFFF"
+                      : isDark
+                        ? "#6B7280"
+                        : "#94A3B8"
+                  }
                 />
               </>
             )}
@@ -568,7 +825,6 @@ export const OnboardingScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FDFCF4",
   },
   container: {
     flex: 1,
@@ -586,7 +842,6 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#94A3B8",
   },
   scroll: {
     flex: 1,
@@ -597,61 +852,44 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#283593",
     marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 13,
-    color: "#64748B",
     lineHeight: 18,
     marginBottom: 16,
   },
   footer: {
     paddingVertical: 12,
-    backgroundColor: "#FDFCF4",
   },
   primaryButton: {
-    backgroundColor: "#FF8C00",
     paddingVertical: 16,
     borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    shadowColor: "#FF8C00",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,
   },
   primaryButtonDisabled: {
-    backgroundColor: "#E2E8F0",
     shadowOpacity: 0,
     elevation: 0,
   },
   primaryButtonText: {
-    color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "700",
   },
-  primaryButtonTextDisabled: {
-    color: "#94A3B8",
-  },
-
   tradesList: {
     gap: 10,
     marginBottom: 20,
   },
   tradeCard: {
-    backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: "#E2E8F0",
     borderRadius: 14,
     padding: 14,
-  },
-  tradeCardSelected: {
-    borderColor: "#283593",
-    backgroundColor: "#EEF2FF",
   },
   tradeCardHeader: {
     flexDirection: "row",
@@ -662,27 +900,16 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#94A3B8",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-  },
-  checkboxSelected: {
-    backgroundColor: "#283593",
-    borderColor: "#283593",
   },
   tradeName: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#334155",
-  },
-  tradeNameSelected: {
-    color: "#283593",
   },
   regulatedBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFEDD5",
     paddingVertical: 2,
     paddingHorizontal: 8,
     borderRadius: 8,
@@ -693,19 +920,15 @@ const styles = StyleSheet.create({
   regulatedBadgeText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#EA580C",
   },
   freeBadgeText: {
     fontSize: 11,
-    color: "#94A3B8",
     marginTop: 2,
   },
   noLicensesNotice: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#D1FAE5",
     borderWidth: 1,
-    borderColor: "#A7F3D0",
     padding: 14,
     borderRadius: 14,
     gap: 10,
@@ -714,7 +937,6 @@ const styles = StyleSheet.create({
   noLicensesNoticeText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#065F46",
     flex: 1,
   },
   licensesContainer: {
@@ -729,11 +951,9 @@ const styles = StyleSheet.create({
   licensesTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#283593",
   },
   licensesSubtitle: {
     fontSize: 12,
-    color: "#64748B",
     marginBottom: 14,
   },
   inputGroup: {
@@ -743,15 +963,12 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#283593",
     marginBottom: 6,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: "#CBD5E1",
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -760,20 +977,16 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: "600",
-    color: "#1E293B",
   },
   inputHelper: {
     fontSize: 11,
-    color: "#94A3B8",
     marginTop: 4,
     marginLeft: 2,
   },
   securityNotice: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EEF2FF",
     borderWidth: 1,
-    borderColor: "#C7D2FE",
     padding: 12,
     borderRadius: 12,
     gap: 10,
@@ -781,7 +994,6 @@ const styles = StyleSheet.create({
   },
   securityNoticeText: {
     fontSize: 12,
-    color: "#3730A3",
     flex: 1,
     lineHeight: 16,
   },
