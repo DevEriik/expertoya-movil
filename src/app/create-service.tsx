@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -24,10 +24,17 @@ import { Colors } from "@/constants/theme";
 import { OficioOption } from "@/types/service";
 import { apiClient } from "@/utils/api";
 import {
+  deleteService,
   getServiceById,
   MAX_ACTIVE_SERVICES,
   saveService,
 } from "@/utils/servicesStorage";
+
+const FONT_FAMILY = Platform.select({
+  web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  ios: "System",
+  default: "sans-serif",
+});
 
 const FALLBACK_OFICIOS: OficioOption[] = [
   { id: 1, nombre_oficio: "Electricista" },
@@ -45,6 +52,7 @@ const SUGGESTED_DURATIONS = [
   "2 a 3 horas",
   "Media jornada",
   "1 día",
+  "2 a 3 días",
 ];
 
 export default function CreateServiceModal() {
@@ -57,7 +65,6 @@ export default function CreateServiceModal() {
   const params = useLocalSearchParams<{ serviceId?: string }>();
   const isEditing = Boolean(params.serviceId);
 
-  // Form State
   const [title, setTitle] = useState("");
   const [selectedOficioId, setSelectedOficioId] = useState<number>(1);
   const [price, setPrice] = useState("");
@@ -66,13 +73,44 @@ export default function CreateServiceModal() {
   const [fotos, setFotos] = useState<string[]>([]);
   const [servicioActivo, setServicioActivo] = useState(true);
 
-  // Aux state
   const [oficios, setOficios] = useState<OficioOption[]>(FALLBACK_OFICIOS);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [aiGenerating, setAiGenerating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    if (Platform.OS === "web" && typeof navigator !== "undefined") {
+      return navigator.onLine;
+    }
+    return true;
+  });
 
-  // Cargar lista de oficios desde el backend o usar fallback
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiElapsedSeconds, setAiElapsedSeconds] = useState(0);
+  const [aiGeneratedSuccess, setAiGeneratedSuccess] = useState(false);
+  const aiTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
+
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (aiTimerRef.current) {
+        clearInterval(aiTimerRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     const fetchOficios = async () => {
@@ -85,7 +123,6 @@ export default function CreateServiceModal() {
           }
         }
       } catch {
-        // Mantiene fallback silenciosamente
       }
     };
     fetchOficios();
@@ -94,7 +131,6 @@ export default function CreateServiceModal() {
     };
   }, []);
 
-  // Cargar datos si estamos en modo edición
   useEffect(() => {
     if (params.serviceId) {
       setIsLoadingData(true);
@@ -124,8 +160,7 @@ export default function CreateServiceModal() {
     }
   };
 
-  // Selector de Fotos con expo-image-picker (máximo 3 fotos)
-  const handlePickImage = async () => {
+  const handlePickFromGallery = async () => {
     if (fotos.length >= 3) {
       Alert.alert(
         "Límite de fotografías",
@@ -135,11 +170,10 @@ export default function CreateServiceModal() {
     }
 
     try {
-      const permissionResult =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
         Alert.alert(
-          "Permisos Requeridos",
+          "Permisos requeridos",
           "Se requiere acceso a la galería para seleccionar fotos del trabajo.",
         );
         return;
@@ -153,12 +187,45 @@ export default function CreateServiceModal() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const newUri = result.assets[0].uri;
-        setFotos((prev) => [...prev, newUri]);
+        setFotos((prev) => [...prev, result.assets[0].uri]);
       }
     } catch (err) {
       console.error("Error al seleccionar imagen:", err);
-      Alert.alert("Error", "No se pudo cargar la imagen seleccionada.");
+      Alert.alert("Error", "No se pudo cargar la imagen de la galería.");
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    if (fotos.length >= 3) {
+      Alert.alert(
+        "Límite de fotografías",
+        "Solo puedes adjuntar hasta 3 fotografías representativas del trabajo terminado.",
+      );
+      return;
+    }
+
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Permisos requeridos",
+          "Se requiere acceso a la cámara para tomar fotos de tus trabajos.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setFotos((prev) => [...prev, result.assets[0].uri]);
+      }
+    } catch (err) {
+      console.error("Error al tomar foto:", err);
+      Alert.alert("Error", "No se pudo abrir la cámara.");
     }
   };
 
@@ -166,29 +233,86 @@ export default function CreateServiceModal() {
     setFotos((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  // Botón Asistente IA (Generador de descripciones comerciales)
-  const handleAIAssistant = () => {
+  const handleGenerateAIDescription = () => {
+    if (!isOnline) {
+      Alert.alert(
+        "Sin conexión a internet",
+        "No es posible utilizar el Asistente IA mientras el dispositivo no cuente con una conexión a internet activa. Revisa tu red móvil o Wi-Fi.",
+        [{ text: "Entendido", style: "default" }],
+      );
+      return;
+    }
+
     if (!title.trim()) {
       Alert.alert(
-        "Asistente IA",
-        "Por favor escribe un título primero para que la IA genere una descripción adaptada a tu servicio.",
+        "Título requerido",
+        "Por favor escribe el título del servicio antes de generar la descripción.",
+        [{ text: "Completar Título", style: "default" }],
       );
       return;
     }
 
     setAiGenerating(true);
-    // Simulación de respuesta inmediata de IA (UI solicitada en alcance prioritario)
-    setTimeout(() => {
-      const oficioNombre =
-        oficios.find((o) => o.id === selectedOficioId)?.nombre_oficio || "Oficio";
-      const generated = `Servicio integral de ${title.trim()} (${oficioNombre}). Trabajo profesional con materiales de primera calidad, diagnóstico exhaustivo y cumplimiento estricto de normas de seguridad. Se garantiza prolijidad, puntualidad y asesoramiento personalizado para asegurar el óptimo funcionamiento y durabilidad.`;
+    setAiElapsedSeconds(0);
+    setAiGeneratedSuccess(false);
 
-      setDescription(generated);
-      setAiGenerating(false);
-    }, 600);
+    let elapsed = 0;
+    const targetSimulatedTime = 3;
+
+    if (aiTimerRef.current) clearInterval(aiTimerRef.current);
+
+    aiTimerRef.current = setInterval(() => {
+      elapsed += 1;
+      setAiElapsedSeconds(elapsed);
+
+      if (elapsed >= targetSimulatedTime) {
+        if (aiTimerRef.current) clearInterval(aiTimerRef.current);
+
+        const cleanTitle = title.trim();
+        const generated = `Servicio profesional de ${cleanTitle}. Trabajo integral realizado con materiales de primera calidad, diagnóstico técnico exhaustivo y cumplimiento estricto de normas de seguridad. Se garantiza prolijidad, puntualidad y asesoramiento personalizado para asegurar un resultado óptimo y duradero.`;
+
+        setDescription(generated);
+        setAiGenerating(false);
+        setAiGeneratedSuccess(true);
+      }
+    }, 1000);
   };
 
-  // Guardar Servicio (Creación o Edición) con validación
+  const handleCancelAIGeneration = () => {
+    if (aiTimerRef.current) {
+      clearInterval(aiTimerRef.current);
+    }
+    setAiGenerating(false);
+    setAiElapsedSeconds(0);
+  };
+
+  const handleDeleteService = () => {
+    if (!params.serviceId) return;
+
+    Alert.alert(
+      "Eliminar Servicio",
+      `¿Estás seguro de que deseas eliminar permanentemente "${title || "este servicio"}"? Esta acción no se puede deshacer.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar Servicio",
+          style: "destructive",
+          onPress: async () => {
+            setIsDeleting(true);
+            try {
+              await deleteService(params.serviceId!);
+              handleClose();
+            } catch (err: any) {
+              Alert.alert("Error", err.message || "No se pudo eliminar el servicio.");
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleSave = async () => {
     if (!title.trim()) {
       Alert.alert("Campo Obligatorio", "Por favor ingresa el título del servicio.");
@@ -233,7 +357,7 @@ export default function CreateServiceModal() {
       Alert.alert(
         "No se pudo guardar",
         err.message ||
-          `Verifica las condiciones o el límite máximo de ${MAX_ACTIVE_SERVICES} servicios activos.`,
+        `Verifica las condiciones o el límite máximo de ${MAX_ACTIVE_SERVICES} servicios activos.`,
       );
     } finally {
       setIsSaving(false);
@@ -250,50 +374,264 @@ export default function CreateServiceModal() {
           style={[
             styles.modalContainer,
             {
-              backgroundColor: colors.backgroundElement,
-              borderColor: isDark ? "#2A3649" : "#E2E8F0",
-              marginTop: Math.max(insets.top + 16, 28),
-              marginBottom: Math.max(insets.bottom + 16, 24),
+              backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+              borderColor: isDark ? "#374151" : "#E2E8F0",
+              marginTop: Math.max(insets.top + 12, 24),
+              marginBottom: Math.max(insets.bottom + 12, 20),
             },
           ]}
         >
-          {/* Header */}
           <View
             style={[
               styles.headerRow,
-              { borderBottomColor: isDark ? "#2A3649" : "#F1F5F9" },
+              {
+                backgroundColor: isDark ? "#121826" : "#FDFCF4",
+                borderBottomColor: isDark ? "#374151" : "#E2E8F0",
+              },
             ]}
           >
-            <View>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {isEditing ? "Editar Servicio" : "Nuevo Servicio"}
-              </Text>
+            <View style={styles.headerLeft}>
+              <View style={styles.headerTitleRow}>
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    { color: isDark ? "#FDFCF4" : "#283593" },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {isEditing ? "Editar Servicio" : "Nuevo Servicio"}
+                </Text>
+                <View
+                  style={[
+                    styles.modeBadge,
+                    {
+                      backgroundColor: isEditing
+                        ? isDark
+                          ? "rgba(51, 239, 165, 0.15)"
+                          : "rgba(0, 191, 165, 0.12)"
+                        : isDark
+                          ? "rgba(255, 183, 77, 0.15)"
+                          : "rgba(255, 140, 0, 0.12)",
+                      borderColor: isEditing
+                        ? isDark
+                          ? "#33EFA5"
+                          : "#00BFA5"
+                        : isDark
+                          ? "#FFB74D"
+                          : "#FF8C00",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={isEditing ? "create-outline" : "sparkles"}
+                    size={12}
+                    color={
+                      isEditing
+                        ? isDark
+                          ? "#33EFA5"
+                          : "#00BFA5"
+                        : isDark
+                          ? "#FFB74D"
+                          : "#FF8C00"
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.modeBadgeText,
+                      {
+                        color: isEditing
+                          ? isDark
+                            ? "#33EFA5"
+                            : "#00BFA5"
+                          : isDark
+                            ? "#FFB74D"
+                            : "#FF8C00",
+                      },
+                    ]}
+                  >
+                    {isEditing ? "Edición" : "Creación"}
+                  </Text>
+                </View>
+              </View>
               <Text
                 style={[
                   styles.modalSubtitle,
-                  { color: colors.textSecondary },
+                  { color: isDark ? "#94A3B8" : "#475569" },
+                ]}
+                numberOfLines={1}
+              >
+                Configura tarifas, fotos y descripción comercial
+              </Text>
+            </View>
+
+            <View style={styles.headerActions}>
+              {isEditing && (
+                <TouchableOpacity
+                  style={[
+                    styles.headerIconBtn,
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(239, 68, 68, 0.15)"
+                        : "rgba(239, 68, 68, 0.08)",
+                      borderColor: isDark ? "#EF4444" : "#FCA5A5",
+                    },
+                  ]}
+                  onPress={handleDeleteService}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Eliminar este servicio"
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.headerIconBtn,
+                  {
+                    backgroundColor: isDark ? "#2A3649" : "#F1F5F9",
+                    borderColor: isDark ? "#374151" : "#E2E8F0",
+                  },
+                ]}
+                onPress={handleClose}
+                activeOpacity={0.7}
+                accessibilityLabel="Cerrar modal"
+                accessibilityRole="button"
+              >
+                <Ionicons
+                  name="close"
+                  size={20}
+                  color={isDark ? "#FDFCF4" : "#283593"}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {!isOnline && (
+            <View
+              style={[
+                styles.offlineBanner,
+                {
+                  backgroundColor: isDark ? "#451A03" : "#FFFBEB",
+                  borderColor: isDark ? "#F59E0B" : "#FBBF24",
+                },
+              ]}
+              accessible={true}
+              accessibilityRole="alert"
+            >
+              <Ionicons
+                name="cloud-offline-outline"
+                size={18}
+                color={isDark ? "#FBBF24" : "#D97706"}
+              />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    styles.offlineBannerTitle,
+                    { color: isDark ? "#FBBF24" : "#B45309" },
+                  ]}
+                >
+                  Sin conexión a internet activa
+                </Text>
+                <Text
+                  style={[
+                    styles.offlineBannerText,
+                    { color: isDark ? "#FDE68A" : "#92400E" },
+                  ]}
+                >
+                  Se requiere conexión activa para utilizar el Asistente IA.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.retryConnectionBtn}
+                onPress={() => setIsOnline(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="refresh"
+                  size={14}
+                  color={isDark ? "#FBBF24" : "#B45309"}
+                />
+                <Text
+                  style={[
+                    styles.retryConnectionText,
+                    { color: isDark ? "#FBBF24" : "#B45309" },
+                  ]}
+                >
+                  Reconectar
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View
+            style={[
+              styles.connectionStatusBar,
+              {
+                backgroundColor: isDark ? "#121826" : "#F8FAFC",
+                borderBottomColor: isDark ? "#2A3649" : "#E2E8F0",
+              },
+            ]}
+          >
+            <View style={styles.connectionStatusIndicator}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: isOnline ? "#10B981" : "#EF4444" },
+                ]}
+              />
+              <Ionicons
+                name={isOnline ? "wifi" : "cloud-offline"}
+                size={12}
+                color={isOnline ? (isDark ? "#34D399" : "#10B981") : "#EF4444"}
+              />
+              <Text
+                style={[
+                  styles.connectionStatusLabel,
+                  { color: isDark ? "#94A3B8" : "#475569" },
                 ]}
               >
-                Completa los datos de tu tarifa y trabajo
+                {isOnline ? "Dispositivo con Internet activo" : "Modo Sin Red (Offline)"}
               </Text>
             </View>
 
             <TouchableOpacity
               style={[
-                styles.closeButton,
-                { backgroundColor: isDark ? "#2A3649" : "#F1F5F9" },
+                styles.toggleSimBtn,
+                {
+                  borderColor: isDark ? "#374151" : "#CBD5E1",
+                  backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+                },
               ]}
-              onPress={handleClose}
+              onPress={() => setIsOnline((prev) => !prev)}
               activeOpacity={0.7}
-              accessibilityLabel="Cerrar modal"
+              accessibilityLabel="Simular cambio de estado de red"
             >
-              <Ionicons name="close" size={20} color={colors.text} />
+              <Text
+                style={[
+                  styles.toggleSimText,
+                  { color: isDark ? "#33EFA5" : "#00BFA5" },
+                ]}
+              >
+                {isOnline ? "Simular Offline" : "Simular Online"}
+              </Text>
             </TouchableOpacity>
           </View>
 
           {isLoadingData ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
+              <ActivityIndicator
+                size="large"
+                color={isDark ? "#FFB74D" : "#FF8C00"}
+              />
+              <Text
+                style={[
+                  styles.loadingText,
+                  { color: isDark ? "#94A3B8" : "#475569" },
+                ]}
+              >
+                Cargando información del servicio...
+              </Text>
             </View>
           ) : (
             <ScrollView
@@ -302,10 +640,14 @@ export default function CreateServiceModal() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* Título */}
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>
-                  Título del Servicio <Text style={{ color: "#EF4444" }}>*</Text>
+                <Text
+                  style={[
+                    styles.label,
+                    { color: isDark ? "#FDFCF4" : "#283593" },
+                  ]}
+                >
+                  Título del Servicio <Text style={styles.requiredAsterisk}>*</Text>
                 </Text>
                 <TextInput
                   style={[
@@ -313,21 +655,25 @@ export default function CreateServiceModal() {
                     {
                       borderColor: isDark ? "#374151" : "#CBD5E1",
                       backgroundColor: isDark ? "#121826" : "#FFFFFF",
-                      color: colors.text,
+                      color: isDark ? "#FDFCF4" : "#283593",
                     },
                   ]}
                   placeholder="Ej: Cambio de Disyuntor y Térmica"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={isDark ? "#94A3B8" : "#60646C"}
                   value={title}
                   onChangeText={setTitle}
                   maxLength={90}
                 />
               </View>
 
-              {/* Categoría / Oficio */}
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>
-                  Categoría / Oficio <Text style={{ color: "#EF4444" }}>*</Text>
+                <Text
+                  style={[
+                    styles.label,
+                    { color: isDark ? "#FDFCF4" : "#283593" },
+                  ]}
+                >
+                  Categoría / Oficio <Text style={styles.requiredAsterisk}>*</Text>
                 </Text>
                 <ScrollView
                   horizontal
@@ -343,17 +689,19 @@ export default function CreateServiceModal() {
                           styles.oficioChip,
                           {
                             borderColor: isSelected
-                              ? colors.primary
+                              ? isDark
+                                ? "#FFB74D"
+                                : "#FF8C00"
                               : isDark
-                              ? "#374151"
-                              : "#E2E8F0",
+                                ? "#374151"
+                                : "#E2E8F0",
                             backgroundColor: isSelected
                               ? isDark
                                 ? "rgba(255, 183, 77, 0.2)"
                                 : "rgba(255, 140, 0, 0.12)"
                               : isDark
-                              ? "#121826"
-                              : "#F8FAFC",
+                                ? "#121826"
+                                : "#FDFCF4",
                           },
                         ]}
                         onPress={() => setSelectedOficioId(oficio.id)}
@@ -363,14 +711,20 @@ export default function CreateServiceModal() {
                           <Ionicons
                             name="checkmark-circle"
                             size={14}
-                            color={colors.primary}
+                            color={isDark ? "#FFB74D" : "#FF8C00"}
                           />
                         )}
                         <Text
                           style={[
                             styles.oficioChipText,
                             {
-                              color: isSelected ? colors.primary : colors.text,
+                              color: isSelected
+                                ? isDark
+                                  ? "#FFB74D"
+                                  : "#FF8C00"
+                                : isDark
+                                  ? "#FDFCF4"
+                                  : "#283593",
                               fontWeight: isSelected ? "700" : "500",
                             },
                           ]}
@@ -383,11 +737,15 @@ export default function CreateServiceModal() {
                 </ScrollView>
               </View>
 
-              {/* Fila: Precio Estimado y Duración */}
               <View style={styles.rowTwoCols}>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={[styles.label, { color: colors.text }]}>
-                    Precio Estimado (ARS) <Text style={{ color: "#EF4444" }}>*</Text>
+                  <Text
+                    style={[
+                      styles.label,
+                      { color: isDark ? "#FDFCF4" : "#283593" },
+                    ]}
+                  >
+                    Precio Estimado (ARS) <Text style={styles.requiredAsterisk}>*</Text>
                   </Text>
                   <View
                     style={[
@@ -401,15 +759,18 @@ export default function CreateServiceModal() {
                     <Text
                       style={[
                         styles.currencyPrefix,
-                        { color: colors.textSecondary },
+                        { color: isDark ? "#FFB74D" : "#FF8C00" },
                       ]}
                     >
                       $
                     </Text>
                     <TextInput
-                      style={[styles.priceInput, { color: colors.text }]}
+                      style={[
+                        styles.priceInput,
+                        { color: isDark ? "#FDFCF4" : "#283593" },
+                      ]}
                       placeholder="Ej: 25000"
-                      placeholderTextColor={colors.textSecondary}
+                      placeholderTextColor={isDark ? "#94A3B8" : "#60646C"}
                       keyboardType="numeric"
                       value={price}
                       onChangeText={setPrice}
@@ -418,8 +779,13 @@ export default function CreateServiceModal() {
                 </View>
 
                 <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={[styles.label, { color: colors.text }]}>
-                    Duración Estimada <Text style={{ color: "#EF4444" }}>*</Text>
+                  <Text
+                    style={[
+                      styles.label,
+                      { color: isDark ? "#FDFCF4" : "#283593" },
+                    ]}
+                  >
+                    Duración Estimada <Text style={styles.requiredAsterisk}>*</Text>
                   </Text>
                   <TextInput
                     style={[
@@ -427,18 +793,17 @@ export default function CreateServiceModal() {
                       {
                         borderColor: isDark ? "#374151" : "#CBD5E1",
                         backgroundColor: isDark ? "#121826" : "#FFFFFF",
-                        color: colors.text,
+                        color: isDark ? "#FDFCF4" : "#283593",
                       },
                     ]}
                     placeholder="Ej: 1 a 2 horas"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={isDark ? "#94A3B8" : "#60646C"}
                     value={duration}
                     onChangeText={setDuration}
                   />
                 </View>
               </View>
 
-              {/* Chips sugeridos de duración */}
               <View style={styles.suggestedDurationContainer}>
                 <ScrollView
                   horizontal
@@ -453,16 +818,20 @@ export default function CreateServiceModal() {
                         {
                           borderColor:
                             duration === dur
-                              ? colors.primary
+                              ? isDark
+                                ? "#FFB74D"
+                                : "#FF8C00"
                               : isDark
-                              ? "#374151"
-                              : "#E2E8F0",
+                                ? "#374151"
+                                : "#E2E8F0",
                           backgroundColor:
                             duration === dur
                               ? isDark
                                 ? "rgba(255, 183, 77, 0.15)"
                                 : "rgba(255, 140, 0, 0.08)"
-                              : "transparent",
+                              : isDark
+                                ? "#121826"
+                                : "#FDFCF4",
                         },
                       ]}
                       onPress={() => setDuration(dur)}
@@ -473,8 +842,12 @@ export default function CreateServiceModal() {
                           {
                             color:
                               duration === dur
-                                ? colors.primary
-                                : colors.textSecondary,
+                                ? isDark
+                                  ? "#FFB74D"
+                                  : "#FF8C00"
+                                : isDark
+                                  ? "#94A3B8"
+                                  : "#475569",
                           },
                         ]}
                       >
@@ -485,51 +858,215 @@ export default function CreateServiceModal() {
                 </ScrollView>
               </View>
 
-              {/* Descripción Comercial y Botón IA */}
+              {/* ASISTENTE IA PARA REDACCIÓN COMERCIAL */}
+              <View
+                style={[
+                  styles.aiCardContainer,
+                  {
+                    backgroundColor: isDark ? "#121826" : "#FDFCF4",
+                    borderColor: isDark ? "#33EFA5" : "#00BFA5",
+                  },
+                ]}
+              >
+                <View style={styles.aiCardHeaderRow}>
+                  <View style={styles.aiTitleWithIcon}>
+                    <Ionicons
+                      name="sparkles"
+                      size={18}
+                      color={isDark ? "#33EFA5" : "#00BFA5"}
+                    />
+                    <Text
+                      style={[
+                        styles.aiCardTitle,
+                        { color: isDark ? "#33EFA5" : "#00897B" },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      Asistente IA
+                    </Text>
+                  </View>
+                </View>
+
+                <Text
+                  style={[
+                    styles.aiCardDescription,
+                    { color: isDark ? "#94A3B8" : "#475569" },
+                  ]}
+                >
+                  Genera automáticamente un texto persuasivo, claro y profesional
+                  adaptado al título de tu servicio para captar más clientes.
+                </Text>
+
+                <TouchableOpacity
+                  style={[
+                    styles.generateAiMainButton,
+                    {
+                      borderColor: !isOnline
+                        ? isDark
+                          ? "#4B5563"
+                          : "#CBD5E1"
+                        : isDark
+                          ? "#33EFA5"
+                          : "#283593",
+                      backgroundColor: !isOnline
+                        ? isDark
+                          ? "#1F2937"
+                          : "#F1F5F9"
+                        : isDark
+                          ? "rgba(51, 239, 165, 0.12)"
+                          : "rgba(40, 53, 147, 0.06)",
+                      opacity: aiGenerating ? 0.8 : 1,
+                    },
+                  ]}
+                  onPress={handleGenerateAIDescription}
+                  disabled={aiGenerating || !isOnline}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Generar descripción con IA"
+                  accessibilityHint="Presiona para autogenerar una propuesta de texto comercial"
+                >
+                  {aiGenerating ? (
+                    <View style={styles.aiLoadingRow}>
+                      <ActivityIndicator
+                        size="small"
+                        color={isDark ? "#33EFA5" : "#283593"}
+                      />
+                      <Text
+                        style={[
+                          styles.aiLoadingText,
+                          { color: isDark ? "#33EFA5" : "#283593" },
+                        ]}
+                      >
+                        Generando propuesta con IA... ({aiElapsedSeconds}s / máx 10s)
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.aiButtonContentRow}>
+                      <Ionicons
+                        name={isOnline ? "sparkles" : "cloud-offline-outline"}
+                        size={18}
+                        color={
+                          !isOnline
+                            ? isDark
+                              ? "#94A3B8"
+                              : "#64748B"
+                            : isDark
+                              ? "#33EFA5"
+                              : "#283593"
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.generateAiMainButtonText,
+                          {
+                            color: !isOnline
+                              ? isDark
+                                ? "#94A3B8"
+                                : "#64748B"
+                              : isDark
+                                ? "#33EFA5"
+                                : "#283593",
+                            fontSize: !isOnline ? 13 : 14,
+                          },
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {isOnline
+                          ? "Generar descripción con IA"
+                          : "IA no disponible sin conexión"}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {aiGenerating && (
+                  <View style={styles.aiCancelRow}>
+                    <TouchableOpacity
+                      onPress={handleCancelAIGeneration}
+                      style={styles.aiCancelBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="close-circle-outline" size={14} color="#EF4444" />
+                      <Text style={styles.aiCancelBtnText}>
+                        Cancelar espera
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {aiGeneratedSuccess && (
+                  <View
+                    style={[
+                      styles.aiSuccessBadge,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(52, 211, 153, 0.15)"
+                          : "rgba(16, 185, 129, 0.12)",
+                        borderColor: isDark ? "#34D399" : "#10B981",
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color={isDark ? "#34D399" : "#10B981"}
+                    />
+                    <Text
+                      style={[
+                        styles.aiSuccessText,
+                        { color: isDark ? "#34D399" : "#047857" },
+                      ]}
+                    >
+                      ¡Texto generado con éxito! Puedes editarlo libremente en el recuadro a continuación.
+                    </Text>
+                  </View>
+                )}
+              </View>
+
               <View style={styles.inputGroup}>
                 <View style={styles.labelWithActionRow}>
-                  <Text style={[styles.label, { color: colors.text }]}>
+                  <Text
+                    style={[
+                      styles.label,
+                      { color: isDark ? "#FDFCF4" : "#283593" },
+                    ]}
+                  >
                     Descripción Comercial
                   </Text>
 
-                  {/* Botón Secundario Asistente IA (Brand Guidelines) */}
-                  <TouchableOpacity
-                    style={[
-                      styles.secondaryAiButton,
-                      {
-                        borderColor: isDark ? "#4B5563" : "#283593",
-                        backgroundColor: isDark
-                          ? "rgba(40, 53, 147, 0.15)"
-                          : "rgba(40, 53, 147, 0.04)",
-                      },
-                    ]}
-                    onPress={handleAIAssistant}
-                    activeOpacity={0.7}
-                    disabled={aiGenerating}
-                  >
-                    {aiGenerating ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={isDark ? "#FFB74D" : "#283593"}
-                      />
-                    ) : (
-                      <>
+                  <View style={styles.descActionsRow}>
+                    {Boolean(description) && (
+                      <TouchableOpacity
+                        onPress={() => setDescription("")}
+                        style={styles.clearDescBtn}
+                        activeOpacity={0.7}
+                        accessibilityLabel="Limpiar texto de descripción"
+                      >
                         <Ionicons
-                          name="sparkles-outline"
-                          size={14}
-                          color={isDark ? "#FFB74D" : "#283593"}
+                          name="trash-outline"
+                          size={13}
+                          color={isDark ? "#94A3B8" : "#64748B"}
                         />
                         <Text
                           style={[
-                            styles.secondaryAiButtonText,
-                            { color: isDark ? "#FFB74D" : "#283593" },
+                            styles.clearDescText,
+                            { color: isDark ? "#94A3B8" : "#64748B" },
                           ]}
                         >
-                          Asistente IA
+                          Limpiar
                         </Text>
-                      </>
+                      </TouchableOpacity>
                     )}
-                  </TouchableOpacity>
+
+                    <Text
+                      style={[
+                        styles.charCounter,
+                        { color: isDark ? "#94A3B8" : "#64748B" },
+                      ]}
+                    >
+                      {description.length}/600
+                    </Text>
+                  </View>
                 </View>
 
                 <TextInput
@@ -538,39 +1075,171 @@ export default function CreateServiceModal() {
                     {
                       borderColor: isDark ? "#374151" : "#CBD5E1",
                       backgroundColor: isDark ? "#121826" : "#FFFFFF",
-                      color: colors.text,
+                      color: isDark ? "#FDFCF4" : "#283593",
                     },
                   ]}
                   placeholder="Detalla qué incluye el trabajo, materiales, garantías o condiciones..."
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={isDark ? "#94A3B8" : "#60646C"}
                   multiline
-                  numberOfLines={4}
+                  numberOfLines={5}
                   textAlignVertical="top"
                   value={description}
                   onChangeText={setDescription}
+                  maxLength={600}
                 />
               </View>
 
-              {/* Fotos del Trabajo Terminado (Hasta 3 fotos) */}
-              <View style={styles.inputGroup}>
+              <View
+                style={[
+                  styles.imageUploadCard,
+                  {
+                    backgroundColor: isDark ? "#121826" : "#FDFCF4",
+                    borderColor: isDark ? "#374151" : "#E2E8F0",
+                  },
+                ]}
+              >
                 <View style={styles.labelWithActionRow}>
-                  <Text style={[styles.label, { color: colors.text }]}>
-                    Fotografías del trabajo terminado
-                  </Text>
-                  <Text
+                  <View style={[styles.sectionHeaderWithIcon, { flex: 1, marginRight: 8 }]}>
+                    <Ionicons
+                      name="images-outline"
+                      size={18}
+                      color={isDark ? "#FFB74D" : "#FF8C00"}
+                    />
+                    <Text
+                      style={[
+                        styles.label,
+                        { color: isDark ? "#FDFCF4" : "#283593", marginBottom: 0, flex: 1 },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      Fotos
+                    </Text>
+                  </View>
+
+                  <View
                     style={[
-                      styles.photoCounter,
+                      styles.photoCountBadge,
                       {
-                        color:
+                        backgroundColor:
                           fotos.length >= 3
-                            ? colors.primary
-                            : colors.textSecondary,
+                            ? isDark
+                              ? "rgba(255, 183, 77, 0.2)"
+                              : "rgba(255, 140, 0, 0.15)"
+                            : isDark
+                              ? "#1F2937"
+                              : "#F1F5F9",
+                        borderColor:
+                          fotos.length >= 3
+                            ? isDark
+                              ? "#FFB74D"
+                              : "#FF8C00"
+                            : isDark
+                              ? "#374151"
+                              : "#CBD5E1",
                       },
                     ]}
                   >
-                    {fotos.length}/3 fotos
-                  </Text>
+                    <Ionicons
+                      name="camera"
+                      size={12}
+                      color={
+                        fotos.length >= 3
+                          ? isDark
+                            ? "#FFB74D"
+                            : "#FF8C00"
+                          : isDark
+                            ? "#94A3B8"
+                            : "#64748B"
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.photoCounter,
+                        {
+                          color:
+                            fotos.length >= 3
+                              ? isDark
+                                ? "#FFB74D"
+                                : "#FF8C00"
+                              : isDark
+                                ? "#94A3B8"
+                                : "#64748B",
+                        },
+                      ]}
+                    >
+                      {fotos.length}/3 fotos
+                    </Text>
+                  </View>
                 </View>
+
+                <Text
+                  style={[
+                    styles.uploadInstructions,
+                    { color: isDark ? "#94A3B8" : "#475569" },
+                  ]}
+                >
+                  Adjunta hasta 3 fotos de trabajos reales realizados para aumentar la
+                  confianza de tus clientes potenciales.
+                </Text>
+
+                {fotos.length < 3 && (
+                  <View style={styles.uploadButtonsRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.uploadActionButton,
+                        {
+                          borderColor: isDark ? "#374151" : "#CBD5E1",
+                          backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+                        },
+                      ]}
+                      onPress={handlePickFromGallery}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Subir foto desde galería"
+                    >
+                      <Ionicons
+                        name="images-outline"
+                        size={20}
+                        color={isDark ? "#33EFA5" : "#00BFA5"}
+                      />
+                      <Text
+                        style={[
+                          styles.uploadActionText,
+                          { color: isDark ? "#FDFCF4" : "#283593" },
+                        ]}
+                      >
+                        Abrir Galería
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.uploadActionButton,
+                        {
+                          borderColor: isDark ? "#374151" : "#CBD5E1",
+                          backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+                        },
+                      ]}
+                      onPress={handleTakePhoto}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Tomar fotografía con cámara"
+                    >
+                      <Ionicons
+                        name="camera-outline"
+                        size={20}
+                        color={isDark ? "#FFB74D" : "#FF8C00"}
+                      />
+                      <Text
+                        style={[
+                          styles.uploadActionText,
+                          { color: isDark ? "#FDFCF4" : "#283593" },
+                        ]}
+                      >
+                        Tomar Foto
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
 
                 <View style={styles.photosGrid}>
                   {fotos.map((uri, idx) => (
@@ -582,58 +1251,66 @@ export default function CreateServiceModal() {
                       ]}
                     >
                       <Image source={{ uri }} style={styles.photoThumb} />
+                      <View style={styles.photoNumberBadge}>
+                        <Text style={styles.photoNumberText}>#{idx + 1}</Text>
+                      </View>
                       <TouchableOpacity
                         style={styles.removePhotoBtn}
                         onPress={() => handleRemovePhoto(idx)}
                         activeOpacity={0.8}
-                        accessibilityLabel="Eliminar foto"
+                        accessibilityLabel={`Eliminar foto número ${idx + 1}`}
                       >
                         <Ionicons
                           name="close-circle"
-                          size={22}
+                          size={24}
                           color="#EF4444"
                         />
                       </TouchableOpacity>
                     </View>
                   ))}
 
-                  {fotos.length < 3 && (
-                    <TouchableOpacity
+                  {fotos.length === 0 && (
+                    <View
                       style={[
-                        styles.addPhotoButton,
+                        styles.emptyPhotosState,
                         {
                           borderColor: isDark ? "#374151" : "#CBD5E1",
-                          backgroundColor: isDark ? "#121826" : "#F8FAFC",
+                          backgroundColor: isDark ? "#121826" : "#FFFFFF",
                         },
                       ]}
-                      onPress={handlePickImage}
-                      activeOpacity={0.7}
                     >
                       <Ionicons
-                        name="camera-outline"
-                        size={26}
-                        color={colors.primary}
+                        name="cloud-upload-outline"
+                        size={32}
+                        color={isDark ? "#94A3B8" : "#94A3B8"}
                       />
                       <Text
                         style={[
-                          styles.addPhotoText,
-                          { color: colors.textSecondary },
+                          styles.emptyPhotosTitle,
+                          { color: isDark ? "#FDFCF4" : "#283593" },
                         ]}
                       >
-                        Adjuntar foto
+                        Sin fotos adjuntadas
                       </Text>
-                    </TouchableOpacity>
+                      <Text
+                        style={[
+                          styles.emptyPhotosSubtitle,
+                          { color: isDark ? "#94A3B8" : "#64748B" },
+                        ]}
+                      >
+                        Toca arriba para elegir de la galería o tomar una foto
+                      </Text>
+                    </View>
                   )}
                 </View>
               </View>
 
-              {/* Interruptor: Servicio Activo / Pausado */}
               <View
                 style={[
                   styles.switchContainer,
                   {
-                    borderColor: isDark ? "#2A3649" : "#E2E8F0",
-                    backgroundColor: isDark ? "#121826" : "#F8FAFC",
+                    borderColor: isDark ? "#374151" : "#E2E8F0",
+                    backgroundColor: isDark ? "#121826" : "#FDFCF4",
                   },
                 ]}
               >
@@ -648,14 +1325,14 @@ export default function CreateServiceModal() {
                             ? "#34D399"
                             : "#10B981"
                           : isDark
-                          ? "#FBBF24"
-                          : "#F59E0B"
+                            ? "#FBBF24"
+                            : "#F59E0B"
                       }
                     />
                     <Text
                       style={[
                         styles.switchLabel,
-                        { color: colors.text },
+                        { color: isDark ? "#FDFCF4" : "#283593" },
                       ]}
                     >
                       {servicioActivo ? "Servicio Activo" : "Servicio Pausado"}
@@ -664,11 +1341,11 @@ export default function CreateServiceModal() {
                   <Text
                     style={[
                       styles.switchDescription,
-                      { color: colors.textSecondary },
+                      { color: isDark ? "#94A3B8" : "#475569" },
                     ]}
                   >
                     {servicioActivo
-                      ? "Visible para clientes en el directorio de búsqueda."
+                      ? "Visible para clientes en el directorio de búsqueda de ExpertoYa."
                       : "Oculto temporalmente. No suma a los 30 servicios activos."}
                   </Text>
                 </View>
@@ -677,44 +1354,125 @@ export default function CreateServiceModal() {
                   value={servicioActivo}
                   onValueChange={setServicioActivo}
                   trackColor={{
-                    false: isDark ? "#374151" : "#CBD5E1",
-                    true: colors.primary,
+                    false: colors.backgroundSelected,
+                    true: colors.secondary,
                   }}
-                  thumbColor="#FFFFFF"
+                  thumbColor={servicioActivo ? "#FFFFFF" : "#F4F4F5"}
                 />
               </View>
+
+              {isEditing && (
+                <View
+                  style={[
+                    styles.dangerZoneCard,
+                    {
+                      borderColor: isDark
+                        ? "rgba(239, 68, 68, 0.4)"
+                        : "rgba(239, 68, 68, 0.3)",
+                      backgroundColor: isDark
+                        ? "rgba(239, 68, 68, 0.08)"
+                        : "#FEF2F2",
+                    },
+                  ]}
+                >
+                  <View style={styles.dangerZoneHeader}>
+                    <Ionicons name="warning-outline" size={18} color="#EF4444" />
+                    <Text style={styles.dangerZoneTitle}>
+                      Gestión del Servicio
+                    </Text>
+                  </View>
+
+                  <Text style={styles.dangerZoneSubtitle}>
+                    Si ya no ofreces este trabajo, puedes darlo de baja permanentemente.
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.deleteFullButton}
+                    onPress={handleDeleteService}
+                    disabled={isDeleting}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Eliminar definitivamente este servicio"
+                  >
+                    {isDeleting ? (
+                      <ActivityIndicator size="small" color="#EF4444" />
+                    ) : (
+                      <>
+                        <Ionicons name="trash" size={16} color="#EF4444" />
+                        <Text style={styles.deleteFullButtonText}>
+                          Eliminar este Servicio
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
             </ScrollView>
           )}
 
-          {/* Footer Save Button */}
           <View
             style={[
               styles.footer,
-              { borderTopColor: isDark ? "#2A3649" : "#F1F5F9" },
+              {
+                backgroundColor: isDark ? "#121826" : "#FDFCF4",
+                borderTopColor: isDark ? "#374151" : "#E2E8F0",
+              },
             ]}
           >
             <TouchableOpacity
               style={[
+                styles.cancelFooterBtn,
+                {
+                  borderColor: isDark ? "#4B5563" : "#CBD5E1",
+                  backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+                },
+              ]}
+              onPress={handleClose}
+              disabled={isSaving}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.cancelFooterText,
+                  { color: isDark ? "#FDFCF4" : "#475569" },
+                ]}
+              >
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
                 styles.saveButton,
                 {
-                  backgroundColor: colors.primary,
+                  backgroundColor: isDark ? "#FFB74D" : "#FF8C00",
                   opacity: isSaving ? 0.7 : 1,
+                  flex: 2,
                 },
               ]}
               onPress={handleSave}
               disabled={isSaving}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
+              accessibilityRole="button"
             >
               {isSaving ? (
-                <ActivityIndicator color="#FFF" />
+                <ActivityIndicator
+                  color={isDark ? "#121826" : "#FFFFFF"}
+                  size="small"
+                />
               ) : (
                 <>
                   <Ionicons
-                    name="cloud-upload-outline"
+                    name={isEditing ? "save-outline" : "cloud-upload-outline"}
                     size={20}
-                    color="#FFF"
+                    color={isDark ? "#121826" : "#FFFFFF"}
                   />
-                  <Text style={styles.buttonText}>
+                  <Text
+                    style={[
+                      styles.buttonText,
+                      { color: isDark ? "#121826" : "#FFFFFF" },
+                    ]}
+                  >
                     {isEditing ? "Guardar Cambios" : "Publicar Servicio"}
                   </Text>
                 </>
@@ -741,15 +1499,15 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     width: "92%",
-    maxWidth: 580,
-    maxHeight: "90%",
+    maxWidth: 600,
+    maxHeight: "92%",
     borderRadius: 24,
-    borderWidth: 1,
+    borderWidth: 1.2,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 10,
     overflow: "hidden",
     display: "flex",
     flexDirection: "column",
@@ -760,29 +1518,132 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
+    borderBottomWidth: 1.2,
+  },
+  headerLeft: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "nowrap",
   },
   modalTitle: {
+    fontFamily: FONT_FAMILY,
     fontSize: 20,
     fontWeight: "800",
     letterSpacing: -0.3,
   },
+  modeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  modeBadgeText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 11,
+    fontWeight: "700",
+  },
   modalSubtitle: {
+    fontFamily: FONT_FAMILY,
     fontSize: 12,
     marginTop: 2,
     fontWeight: "500",
   },
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    gap: 10,
+  },
+  offlineBannerTitle: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  offlineBannerText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  retryConnectionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  retryConnectionText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  connectionStatusBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+  },
+  connectionStatusIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  connectionStatusLabel: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  toggleSimBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  toggleSimText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 10,
+    fontWeight: "700",
   },
   loadingContainer: {
     padding: 60,
     alignItems: "center",
     justifyContent: "center",
+    gap: 12,
+  },
+  loadingText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 13,
+    fontWeight: "500",
   },
   scrollContent: {
     flex: 1,
@@ -795,9 +1656,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
+    fontFamily: FONT_FAMILY,
     fontSize: 13,
     fontWeight: "700",
     letterSpacing: 0.2,
+  },
+  requiredAsterisk: {
+    color: "#EF4444",
   },
   labelWithActionRow: {
     flexDirection: "row",
@@ -805,6 +1670,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   input: {
+    fontFamily: FONT_FAMILY,
     borderWidth: 1.2,
     borderRadius: 12,
     paddingHorizontal: 14,
@@ -823,11 +1689,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   currencyPrefix: {
+    fontFamily: FONT_FAMILY,
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "800",
     marginRight: 6,
   },
   priceInput: {
+    fontFamily: FONT_FAMILY,
     flex: 1,
     paddingVertical: 10,
     fontSize: 15,
@@ -846,6 +1714,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
   },
   oficioChipText: {
+    fontFamily: FONT_FAMILY,
     fontSize: 13,
   },
   suggestedDurationContainer: {
@@ -858,51 +1727,216 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   smallDurationText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  aiCardContainer: {
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+  },
+  aiCardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  aiTitleWithIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  aiCardTitle: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 14,
+    fontWeight: "800",
+    flex: 1,
+  },
+  aiCardDescription: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  generateAiMainButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1.8,
+    width: "100%",
+  },
+  aiButtonContentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    maxWidth: "100%",
+    paddingHorizontal: 4,
+  },
+  generateAiMainButtonText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: 0.1,
+    textAlign: "center",
+    flexShrink: 1,
+  },
+  aiLoadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  aiLoadingText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  aiCancelRow: {
+    alignItems: "center",
+  },
+  aiCancelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 2,
+  },
+  aiCancelBtnText: {
+    fontFamily: FONT_FAMILY,
+    color: "#EF4444",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  aiSuccessBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  aiSuccessText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
+    lineHeight: 16,
+  },
+  descActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  clearDescBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  clearDescText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  charCounter: {
+    fontFamily: FONT_FAMILY,
     fontSize: 11,
     fontWeight: "600",
   },
   textArea: {
+    fontFamily: FONT_FAMILY,
     borderWidth: 1.2,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 14,
-    minHeight: 88,
+    minHeight: 110,
+    lineHeight: 20,
   },
-  secondaryAiButton: {
+  imageUploadCard: {
+    borderWidth: 1.2,
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+  },
+  sectionHeaderWithIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  photoCountBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 14,
-    borderWidth: 1.2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexShrink: 0,
   },
-  secondaryAiButtonText: {
+  photoCounter: {
+    fontFamily: FONT_FAMILY,
     fontSize: 11,
     fontWeight: "700",
   },
-  photoCounter: {
+  uploadInstructions: {
+    fontFamily: FONT_FAMILY,
     fontSize: 12,
-    fontWeight: "600",
+    lineHeight: 16,
+  },
+  uploadButtonsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  uploadActionButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.2,
+  },
+  uploadActionText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 13,
+    fontWeight: "700",
   },
   photosGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginTop: 4,
+    marginTop: 2,
   },
   photoThumbWrapper: {
-    width: 84,
-    height: 84,
+    width: 86,
+    height: 86,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.2,
     overflow: "hidden",
     position: "relative",
   },
   photoThumb: {
     width: "100%",
     height: "100%",
+  },
+  photoNumberBadge: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  photoNumberText: {
+    fontFamily: FONT_FAMILY,
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
   },
   removePhotoBtn: {
     position: "absolute",
@@ -911,19 +1945,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
   },
-  addPhotoButton: {
-    width: 84,
-    height: 84,
+  emptyPhotosState: {
+    width: "100%",
+    paddingVertical: 18,
+    paddingHorizontal: 12,
     borderRadius: 12,
-    borderWidth: 1.5,
+    borderWidth: 1.2,
     borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
   },
-  addPhotoText: {
+  emptyPhotosTitle: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  emptyPhotosSubtitle: {
+    fontFamily: FONT_FAMILY,
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: "500",
     textAlign: "center",
   },
   switchContainer: {
@@ -932,8 +1973,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 14,
     borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 4,
+    borderWidth: 1.2,
   },
   switchTitleRow: {
     flexDirection: "row",
@@ -942,25 +1982,85 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   switchLabel: {
+    fontFamily: FONT_FAMILY,
     fontSize: 14,
     fontWeight: "700",
   },
   switchDescription: {
+    fontFamily: FONT_FAMILY,
     fontSize: 12,
     lineHeight: 16,
   },
+  dangerZoneCard: {
+    borderRadius: 14,
+    borderWidth: 1.2,
+    padding: 14,
+    gap: 8,
+  },
+  dangerZoneHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  dangerZoneTitle: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#EF4444",
+  },
+  dangerZoneSubtitle: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 12,
+    color: "#EF4444",
+    opacity: 0.9,
+    lineHeight: 16,
+  },
+  deleteFullButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.2,
+    borderColor: "#EF4444",
+    backgroundColor: "#FFFFFF",
+    marginTop: 4,
+  },
+  deleteFullButtonText: {
+    fontFamily: FONT_FAMILY,
+    color: "#EF4444",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 14,
-    borderTopWidth: 1,
+    borderTopWidth: 1.2,
+  },
+  cancelFooterBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1.2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelFooterText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 14,
+    fontWeight: "700",
   },
   saveButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
+    paddingVertical: 13,
+    borderRadius: 12,
     shadowColor: "#FF8C00",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
@@ -968,8 +2068,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   buttonText: {
-    color: "#FFFFFF",
+    fontFamily: FONT_FAMILY,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 });
