@@ -1,16 +1,15 @@
 // src/components/home/HeroIA.tsx
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Platform,
-  useColorScheme,
-} from "react-native";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from "react-native";
 
 export function HeroIA() {
   const scheme = useColorScheme();
@@ -18,29 +17,37 @@ export function HeroIA() {
   const colors = Colors[isDark ? "dark" : "light"];
 
   return (
-    <View 
+    <View
       style={[
-        styles.card, 
-        { 
+        styles.card,
+        {
           backgroundColor: colors.backgroundElement,
           borderColor: colors.backgroundSelected,
           borderWidth: 1,
           shadowOpacity: isDark ? 0.35 : 0.08,
-        }
+        },
       ]}
     >
       {/* Etiqueta de IA */}
-      <View 
+      <View
         style={[
           styles.badgeContainer,
-          { 
-            backgroundColor: isDark ? "rgba(51, 239, 165, 0.12)" : "rgba(0, 191, 165, 0.1)",
-            borderColor: isDark ? "rgba(51, 239, 165, 0.25)" : "rgba(0, 191, 165, 0.2)",
+          {
+            backgroundColor: isDark
+              ? "rgba(51, 239, 165, 0.12)"
+              : "rgba(0, 191, 165, 0.1)",
+            borderColor: isDark
+              ? "rgba(51, 239, 165, 0.25)"
+              : "rgba(0, 191, 165, 0.2)",
             borderWidth: 1,
-          }
+          },
         ]}
       >
-        <MaterialCommunityIcons name="magic-staff" size={16} color={colors.secondary} />
+        <MaterialCommunityIcons
+          name="magic-staff"
+          size={16}
+          color={colors.secondary}
+        />
         <Text style={[styles.badgeText, { color: colors.secondary }]}>
           Búsqueda con Inteligencia Artificial
         </Text>
@@ -58,13 +65,13 @@ export function HeroIA() {
       </Text>
 
       {/* Caja de Búsqueda Interactiva */}
-      <View 
+      <View
         style={[
           styles.searchContainer,
-          { 
+          {
             backgroundColor: colors.background,
             borderColor: colors.backgroundSelected,
-          }
+          },
         ]}
       >
         <View style={styles.inputRow}>
@@ -79,38 +86,46 @@ export function HeroIA() {
         {/* Fila inferior de herramientas e IA */}
         <View style={styles.toolsRow}>
           <View style={styles.iconGroup}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.iconButton,
-                { 
+                {
                   backgroundColor: colors.backgroundElement,
                   borderColor: colors.backgroundSelected,
                   borderWidth: 1,
-                }
+                },
               ]}
             >
-              <Ionicons name="mic-outline" size={22} color={colors.textSecondary} />
+              <Ionicons
+                name="mic-outline"
+                size={22}
+                color={colors.textSecondary}
+              />
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.iconButton,
-                { 
+                {
                   backgroundColor: colors.backgroundElement,
                   borderColor: colors.backgroundSelected,
                   borderWidth: 1,
-                }
+                },
               ]}
             >
-              <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
+              <Ionicons
+                name="camera-outline"
+                size={22}
+                color={colors.textSecondary}
+              />
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.aiButton,
-              { 
+              {
                 backgroundColor: colors.secondary,
-              }
+              },
             ]}
           >
             <MaterialCommunityIcons
@@ -118,7 +133,12 @@ export function HeroIA() {
               size={18}
               color={isDark ? "#121826" : "#FFFFFF"}
             />
-            <Text style={[styles.aiButtonText, { color: isDark ? "#121826" : "#FFFFFF" }]}>
+            <Text
+              style={[
+                styles.aiButtonText,
+                { color: isDark ? "#121826" : "#FFFFFF" },
+              ]}
+            >
               Preguntar a la IA
             </Text>
           </TouchableOpacity>

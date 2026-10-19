@@ -1,19 +1,18 @@
 // src/app/(tabs)/index.tsx
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Platform,
-  useColorScheme,
-} from "react-native";
-import { Link } from "expo-router";
+import { Logo } from "@/components/Logo";
 import { Colors } from "@/constants/theme";
+import { Link } from "expo-router";
+import {
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from "react-native";
 import { HeroIA } from "../../components/inicio/HeroIA";
 import { PagosSeguros } from "../../components/inicio/pagosSeguros";
-import { Logo } from "@/components/Logo";
 
 export default function InicioScreen() {
   const scheme = useColorScheme();
@@ -25,21 +24,30 @@ export default function InicioScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.contentContainer}
     >
-      <Logo width={180} height={40} style={{ alignSelf: "flex-start", marginBottom: 16, marginLeft: 4 }} />
+      <Logo
+        width={180}
+        height={40}
+        style={{ alignSelf: "flex-start", marginBottom: 16, marginLeft: 4 }}
+      />
       <HeroIA />
       <PagosSeguros />
       <View style={styles.buttonContainer}>
         <Link href="/onboarding" asChild>
-          <TouchableOpacity 
-            style={[
-              styles.primaryButton, 
-              { 
-                backgroundColor: colors.primary, 
-                shadowColor: colors.primary 
-              }
-            ]}
+          <TouchableOpacity
+            style={StyleSheet.flatten([
+              styles.primaryButton,
+              {
+                backgroundColor: colors.primary,
+                shadowColor: colors.primary,
+              },
+            ])}
           >
-            <Text style={[styles.primaryButtonText, { color: isDark ? "#121826" : "#FFFFFF" }]}>
+            <Text
+              style={[
+                styles.primaryButtonText,
+                { color: isDark ? "#121826" : "#FFFFFF" },
+              ]}
+            >
               Probar Registro de Profesional
             </Text>
           </TouchableOpacity>
