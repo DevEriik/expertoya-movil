@@ -297,6 +297,16 @@ export default function CreateServiceModal() {
     setFotos((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
+  const PALABRAS_OFENSIVAS = [
+    "estafa", "robo", "trucho", "ilegal", "incompetente", "mierda", "puto", "puta",
+    "estafador", "tonto", "estupido", "tarado", "pelotudo", "garca", "chanta"
+  ];
+
+  const contieneLenguajeInapropiado = (texto: string): boolean => {
+    const limpio = texto.toLowerCase();
+    return PALABRAS_OFENSIVAS.some((palabra) => limpio.includes(palabra));
+  };
+
   const handleGenerateAIDescription = () => {
     if (!isOnline) {
       Alert.alert(
@@ -312,6 +322,15 @@ export default function CreateServiceModal() {
         "Título requerido",
         "Por favor escribe el título del servicio antes de generar la descripción.",
         [{ text: "Completar Título", style: "default" }],
+      );
+      return;
+    }
+
+    if (contieneLenguajeInapropiado(title)) {
+      Alert.alert(
+        "Contenido no permitido",
+        "El título ingresado contiene términos o lenguaje inapropiado detectado por los filtros de seguridad de la IA. Por favor corrígelo para continuar.",
+        [{ text: "Entendido", style: "default" }]
       );
       return;
     }
@@ -380,6 +399,15 @@ export default function CreateServiceModal() {
   const handleSave = async () => {
     if (!title.trim()) {
       Alert.alert("Campo Obligatorio", "Por favor ingresa el título del servicio.");
+      return;
+    }
+
+    if (contieneLenguajeInapropiado(title) || contieneLenguajeInapropiado(description)) {
+      Alert.alert(
+        "Contenido no permitido",
+        "El título o la descripción contiene términos no permitidos o lenguaje inapropiado. Por favor corrígelo para continuar.",
+        [{ text: "Entendido", style: "default" }]
+      );
       return;
     }
 

@@ -31,6 +31,7 @@ interface ProfilePreviewModalProps {
   calificacion?: number;
   totalReviews?: number;
   servicios?: ServicioPublicadoItem[];
+  aniosExperiencia?: string;
 }
 
 export default function ProfilePreviewModal({
@@ -46,6 +47,7 @@ export default function ProfilePreviewModal({
   calificacion = 4.9,
   totalReviews = 310,
   servicios,
+  aniosExperiencia,
 }: ProfilePreviewModalProps) {
   const insets = useSafeAreaInsets();
   const colors = useTheme();
@@ -214,6 +216,20 @@ export default function ProfilePreviewModal({
               </Text>
             </View>
 
+            {aniosExperiencia ? (
+              <View style={styles.metaRow}>
+                <Ionicons name="time-outline" size={16} color="#FF8C00" />
+                <Text
+                  style={[
+                    styles.metaText,
+                    { color: isDark ? "#E2E8F0" : "#283593" },
+                  ]}
+                >
+                  {aniosExperiencia} {Number(aniosExperiencia) === 1 ? "año" : "años"} de experiencia
+                </Text>
+              </View>
+            ) : null}
+
             <View style={styles.metaRow}>
               <Ionicons name="star" size={16} color="#F59E0B" />
               <Text
@@ -280,10 +296,14 @@ export default function ProfilePreviewModal({
                 "Hola, soy profesional matriculado con amplia trayectoria en instalaciones residenciales y comerciales. Garantizo trabajos limpios, seguros y bajo normativa vigente."}
             </Text>
 
-            <View style={styles.aiBadge}>
-              <View style={styles.aiDot} />
-              <Text style={styles.aiBadgeText}>Descripción optimizada con IA</Text>
-            </View>
+            {aniosExperiencia ? (
+              <View style={styles.experienceBadge}>
+                <Ionicons name="ribbon-outline" size={16} color="#FF8C00" />
+                <Text style={styles.experienceBadgeText}>
+                  {aniosExperiencia} {Number(aniosExperiencia) === 1 ? "año" : "años"} de trayectoria profesional
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <View
@@ -694,26 +714,22 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 12,
   },
-  aiBadge: {
+  experienceBadge: {
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(0, 191, 165, 0.12)",
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    backgroundColor: "rgba(255, 140, 0, 0.12)",
+    paddingVertical: 5,
+    paddingHorizontal: 12,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 140, 0, 0.25)",
   },
-  aiDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#00BFA5",
-  },
-  aiBadgeText: {
-    fontSize: 11.5,
-    fontWeight: "600",
-    color: "#00BFA5",
+  experienceBadgeText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#FF8C00",
   },
   serviceRow: {
     flexDirection: "row",

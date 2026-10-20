@@ -244,6 +244,7 @@ export default function EditProfileScreen() {
   const [apellido, setApellido] = useState(usuario?.apellido || "");
   const [telefono, setTelefono] = useState("");
   const [bio, setBio] = useState("");
+  const [aniosExperiencia, setAniosExperiencia] = useState("");
   const [disponible, setDisponible] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -377,6 +378,9 @@ export default function EditProfileScreen() {
               setTelefono(data.telefono || "");
               setBio(data.descripcion_perfil || "");
               setZonasCobertura(data.ubicacion_geografica || "");
+              if (data.experiencia !== undefined && data.experiencia !== null) {
+                setAniosExperiencia(String(data.experiencia));
+              }
               if (data.foto_perfil) {
                 const isExpired =
                   data.foto_perfil.startsWith("blob:") ||
@@ -549,6 +553,9 @@ export default function EditProfileScreen() {
         formData.append("descripcion_perfil", bio.trim());
         formData.append("ubicacion_geografica", zonasCobertura.trim());
         formData.append("disponible", String(disponible));
+        if (aniosExperiencia.trim()) {
+          formData.append("experiencia", aniosExperiencia.trim());
+        }
         formData.append("oficios_ids", JSON.stringify(selectedOficios));
         if (Platform.OS === "web") {
           try {
@@ -585,6 +592,7 @@ export default function EditProfileScreen() {
           descripcion_perfil: bio.trim(),
           ubicacion_geografica: zonasCobertura.trim(),
           disponible,
+          ...(aniosExperiencia.trim() ? { experiencia: parseInt(aniosExperiencia.trim(), 10) } : {}),
         };
 
         if (showProFields) {
@@ -630,7 +638,7 @@ export default function EditProfileScreen() {
         Alert.alert(
           "Error al actualizar",
           errorData.error ||
-            "Hubo un problema al guardar los datos en el servidor.",
+          "Hubo un problema al guardar los datos en el servidor.",
           [{ text: "Aceptar" }],
         );
       }
@@ -800,25 +808,47 @@ export default function EditProfileScreen() {
                 </View>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>
-                  Teléfono de Contacto
-                </Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.backgroundElement,
-                      borderColor: colors.backgroundSelected,
-                      color: colors.text,
-                    },
-                  ]}
-                  placeholder="+54 9 11..."
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="phone-pad"
-                  value={telefono}
-                  onChangeText={setTelefono}
-                />
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={[styles.label, { color: colors.text }]}>
+                    Teléfono de Contacto
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.backgroundElement,
+                        borderColor: colors.backgroundSelected,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="+54 9 11..."
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="phone-pad"
+                    value={telefono}
+                    onChangeText={setTelefono}
+                  />
+                </View>
+                {showProFields && (
+                  <View style={[styles.inputGroup, { width: 110, marginLeft: 8 }]}>
+                    <Text style={[styles.label, { color: colors.text }]}>Años Exp.</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: colors.backgroundElement,
+                          borderColor: colors.backgroundSelected,
+                          color: colors.text,
+                        },
+                      ]}
+                      placeholder="Ej: 8"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="numeric"
+                      value={aniosExperiencia}
+                      onChangeText={setAniosExperiencia}
+                    />
+                  </View>
+                )}
               </View>
             </View>
 
@@ -1036,13 +1066,13 @@ export default function EditProfileScreen() {
                             styles.chip,
                             isSelected
                               ? {
-                                  backgroundColor: colors.secondary,
-                                  borderColor: colors.secondary,
-                                }
+                                backgroundColor: colors.secondary,
+                                borderColor: colors.secondary,
+                              }
                               : {
-                                  backgroundColor: colors.backgroundElement,
-                                  borderColor: colors.backgroundSelected,
-                                },
+                                backgroundColor: colors.backgroundElement,
+                                borderColor: colors.backgroundSelected,
+                              },
                           ]}
                           onPress={() => toggleOficio(oficio.id)}
                           activeOpacity={0.7}
@@ -1618,6 +1648,7 @@ export default function EditProfileScreen() {
         fotoPerfil={getSafeAvatarUri(avatarUri)}
         bio={bio}
         zonasCobertura={zonasCobertura}
+        aniosExperiencia={aniosExperiencia}
         oficiosNombres={selectedOficios.map(
           (id) => oficiosList.find((o) => o.id === id)?.nombre || "Oficio",
         )}
