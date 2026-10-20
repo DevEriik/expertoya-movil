@@ -1,3 +1,6 @@
+import { useEffect } from "react";
+import * as Location from "expo-location";
+import { getToken, saveToken } from "@/utils/secureStore";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 
@@ -12,6 +15,21 @@ SplashScreen.preventAutoHideAsync();
 
 function RootNavigation() {
   const { isDarkMode } = useAccessibility();
+
+  useEffect(() => {
+    const pedirPermisoUbicacionInicial = async () => {
+      try {
+        const yaSolicitado = await getToken("location_permission_requested");
+        if (!yaSolicitado) {
+          await Location.requestForegroundPermissionsAsync();
+          await saveToken("location_permission_requested", "true");
+        }
+      } catch (err) {
+        console.warn("No se pudo solicitar permiso de ubicación en inicio:", err);
+      }
+    };
+    pedirPermisoUbicacionInicial();
+  }, []);
 
   return (
     <ThemeProvider value={isDarkMode ? DarkTheme : DefaultTheme}>
