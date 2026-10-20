@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   Image,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -43,7 +44,9 @@ export default function ServiceDetailModal({
 
   if (!service) return null;
 
-  const fotos = service.fotos_servicio || [];
+  const fotos = (service.fotos_servicio || []).filter(
+    (f) => !(Platform.OS === "web" && typeof f === "string" && f.startsWith("blob:"))
+  );
   const activeImage = fotos.length > 0 ? fotos[activePhotoIdx] || fotos[0] : null;
   const isActivo = service.servicio_activo;
 

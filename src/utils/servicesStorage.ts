@@ -9,7 +9,7 @@ export const MAX_ACTIVE_SERVICES = 30;
 const DEFAULT_SERVICES: ServicioPublicadoItem[] = [
   {
     id: "1",
-    oficio_id: 1,
+    oficio_id: 3,
     nombre_oficio: "Electricista",
     titulo_servicio: "Reparación de Tablero Eléctrico",
     descripcion_servicio:
@@ -23,7 +23,7 @@ const DEFAULT_SERVICES: ServicioPublicadoItem[] = [
   },
   {
     id: "2",
-    oficio_id: 1,
+    oficio_id: 3,
     nombre_oficio: "Electricista",
     titulo_servicio: "Instalación de Tomacorrientes y Llaves de Luz",
     descripcion_servicio:

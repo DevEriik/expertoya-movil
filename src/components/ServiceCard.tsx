@@ -1,6 +1,7 @@
 import React from "react";
 import {
   Image,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -60,7 +61,10 @@ export default function ServiceCard({
 
   const isActivo = currentItem.servicio_activo;
   const fotos = currentItem.fotos_servicio || [];
-  const primaryImage = fotos.length > 0 ? fotos[0] : null;
+  const rawImage = fotos.length > 0 ? fotos[0] : null;
+  // Si en Web viene un "blob:" que no sea Data URL o URL http/https real, en sesiones posteriores ya no existe
+  const isDeadBlob = Platform.OS === "web" && typeof rawImage === "string" && rawImage.startsWith("blob:");
+  const primaryImage = isDeadBlob ? null : rawImage;
   const [imgError, setImgError] = React.useState(false);
 
   return (

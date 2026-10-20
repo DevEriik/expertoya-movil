@@ -5,12 +5,12 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  ScrollView,
-  Platform,
+  View,
 } from "react-native";
 import { Link } from "expo-router";
 import { useTheme } from "@/hooks/use-theme";
 import { useAccessibility } from "@/context/AccessibilityContext";
+import { Logo } from "@/components/Logo";
 import { HeroIA } from "../../components/inicio/HeroIA";
 import { PagosSeguros } from "../../components/inicio/pagosSeguros";
 
