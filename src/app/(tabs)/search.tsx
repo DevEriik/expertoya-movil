@@ -1,12 +1,12 @@
+import ProfilePreviewModal from "@/components/ProfilePreviewModal";
 import { useTheme } from "@/hooks/use-theme";
 import { useLocation } from "@/hooks/useLocation";
+import { ServicioPublicadoItem } from "@/types/service";
 import { apiClient } from "@/utils/api";
 import { COVERAGE_MESSAGE, isInCoverageZone } from "@/utils/geoZone";
-import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
-import ProfilePreviewModal from "@/components/ProfilePreviewModal";
-import { ServicioPublicadoItem } from "@/types/service";
 import { getPublicServicesByProfessionalId } from "@/utils/servicesStorage";
+import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -42,6 +42,9 @@ interface Profesional {
   distanciaKm?: number;
 }
 
+const RADIOS_KM = [5, 10, 20] as const;
+const RADIO_POR_DEFECTO = 10;
+
 export default function BusquedaScreen() {
   const colors = useTheme();
   const {
@@ -65,6 +68,7 @@ export default function BusquedaScreen() {
   const [precioMin, setPrecioMin] = useState("");
   const [precioMax, setPrecioMax] = useState("");
   const [sortByPriceAsc, setSortByPriceAsc] = useState(false);
+  const [radioKm, setRadioKm] = useState<number>(RADIO_POR_DEFECTO);
 
   // Estado para visualización del perfil del profesional por parte del cliente
   const [selectedPro, setSelectedPro] = useState<Profesional | null>(null);
@@ -120,13 +124,29 @@ export default function BusquedaScreen() {
   };
 
   const buscarProfesionales = async () => {
+    let searchCoords = coords;
+
+    if (useGPS && !searchCoords) {
+      setLoading(true);
+      searchCoords = await getCurrentLocation();
+      if (!searchCoords) {
+        setLoading(false);
+        setUseGPS(false);
+        Alert.alert(
+          "Ubicación necesaria",
+          "No pudimos obtener tu ubicación. Activá el GPS o usá dirección manual.",
+        );
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (searchTerm.trim()) params.append("nombre", searchTerm.trim());
-      if (useGPS && coords) {
-        params.append("lat", String(coords.lat));
-        params.append("lng", String(coords.lng));
+      if (useGPS && searchCoords) {
+        params.append("lat", String(searchCoords.lat));
+        params.append("lng", String(searchCoords.lng));
       }
       if (!useGPS && manualAddress.trim()) {
         params.append("direccion", manualAddress.trim());
@@ -145,6 +165,7 @@ export default function BusquedaScreen() {
         const data = await response.json();
         const result = data?.data ?? data;
         setProfesionales(Array.isArray(result) ? result : []);
+        setOutOfZone(Boolean(data?.fueraDeCobertura));
       } else {
         setProfesionales([]);
       }
@@ -157,6 +178,16 @@ export default function BusquedaScreen() {
       setHasSearched(true);
     }
   };
+
+  const profesionalesVisibles = useMemo(() => {
+    if (!useGPS || !coords) return profesionales;
+
+    return profesionales.filter((p) => (p.distanciaKm ?? Infinity) <= radioKm);
+  }, [profesionales, radioKm, useGPS, coords]);
+
+  const siguienteRadio = RADIOS_KM.find((r) => r > radioKm);
+  const sinResultadosEnRadio =
+    profesionales.length > 0 && profesionalesVisibles.length === 0;
 
   const renderProfesional = ({ item }: { item: Profesional }) => (
     <TouchableOpacity
@@ -228,7 +259,7 @@ export default function BusquedaScreen() {
         </View>
       ) : (
         <FlatList
-          data={profesionales}
+          data={profesionalesVisibles}
           renderItem={renderProfesional}
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContent}
@@ -352,6 +383,48 @@ export default function BusquedaScreen() {
                   </View>
                 )}
 
+                {useGPS && coords && (
+                  <View style={styles.radiusSection}>
+                    <Text style={[styles.filterLabel, { color: colors.text }]}>
+                      Distancia máxima
+                    </Text>
+                    <View style={styles.chipsRow}>
+                      {RADIOS_KM.map((km) => {
+                        const activo = km === radioKm;
+                        return (
+                          <TouchableOpacity
+                            key={km}
+                            onPress={() => setRadioKm(km)}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected: activo }}
+                            accessibilityLabel={`Radio de ${km} kilómetros`}
+                            style={[
+                              styles.chip,
+                              {
+                                backgroundColor: activo
+                                  ? colors.primary
+                                  : colors.background,
+                                borderColor: colors.backgroundSelected,
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.chipText,
+                                {
+                                  color: activo ? "#FFFFFF" : colors.text,
+                                },
+                              ]}
+                            >
+                              {km} km
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
                 {!useGPS && (
                   <TextInput
                     style={[
@@ -367,6 +440,16 @@ export default function BusquedaScreen() {
                     value={manualAddress}
                     onChangeText={setManualAddress}
                   />
+                )}
+                {!useGPS && (
+                  <Text
+                    style={[
+                      styles.locationStatusText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    El filtro por distancia se aplica solo con GPS.
+                  </Text>
                 )}
 
                 {outOfZone && (
@@ -609,18 +692,74 @@ export default function BusquedaScreen() {
           }
           ListEmptyComponent={
             hasSearched ? (
-              <View style={styles.emptyContainer}>
-                <Ionicons
-                  name="search-outline"
-                  size={48}
-                  color={colors.textSecondary}
-                />
-                <Text
-                  style={[styles.emptyText, { color: colors.textSecondary }]}
-                >
-                  No se encontraron profesionales
-                </Text>
-              </View>
+              outOfZone ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons
+                    name="warning-outline"
+                    size={48}
+                    color={colors.warning}
+                  />
+                  <Text
+                    style={[styles.emptyText, { color: colors.textSecondary }]}
+                  >
+                    Tu ubicación está fuera de la zona de cobertura.
+                  </Text>
+                </View>
+              ) : sinResultadosEnRadio ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons
+                    name="navigate-outline"
+                    size={48}
+                    color={colors.primary}
+                  />
+                  <Text
+                    style={[styles.emptyText, { color: colors.textSecondary }]}
+                  >
+                    No hay profesionales a menos de {radioKm} km.
+                  </Text>
+                  {siguienteRadio ? (
+                    <TouchableOpacity
+                      onPress={() => setRadioKm(siguienteRadio)}
+                      style={[
+                        styles.emptyAction,
+                        { borderColor: colors.primary },
+                      ]}
+                      accessibilityRole="button"
+                    >
+                      <Text
+                        style={[
+                          styles.emptyActionText,
+                          { color: colors.primary },
+                        ]}
+                      >
+                        Ampliar a {siguienteRadio} km
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text
+                      style={[
+                        styles.emptyText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      Probá quitando filtros de oficio o precio.
+                    </Text>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Ionicons
+                    name="search-outline"
+                    size={48}
+                    color={colors.textSecondary}
+                  />
+                  <Text
+                    style={[styles.emptyText, { color: colors.textSecondary }]}
+                  >
+                    No se encontraron profesionales
+                  </Text>
+                </View>
+              )
             ) : (
               <View style={styles.emptyContainer}>
                 <Text
@@ -679,6 +818,7 @@ const styles = StyleSheet.create({
   locationButtonText: { fontSize: 14, fontWeight: "600" },
   locationStatus: { paddingVertical: 4 },
   locationStatusText: { fontSize: 13 },
+  radiusSection: { gap: 8 },
   manualInput: {
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -725,6 +865,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 60,
     gap: 12,
+  },
+  emptyAction: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  emptyActionText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   emptyText: { fontSize: 15, textAlign: "center" },
   filterToggle: {
