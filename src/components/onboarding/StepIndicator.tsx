@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAccessibility } from '@/context/AccessibilityContext';
 
 interface StepIndicatorProps {
     currentStep: number;
@@ -13,13 +14,23 @@ const STEPS = [
 ];
 
 export const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
+    const { isDarkMode: isDark } = useAccessibility();
+
     return (
         <View style={styles.container}>
-            <View style={styles.backgroundLine} />
+            <View
+                style={[
+                    styles.backgroundLine,
+                    { backgroundColor: isDark ? '#374151' : '#E2E8F0' },
+                ]}
+            />
             <View
                 style={[
                     styles.activeLine,
-                    { width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` },
+                    {
+                        width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%`,
+                        backgroundColor: isDark ? '#FFB74D' : '#FF8C00',
+                    },
                 ]}
             />
 
@@ -32,17 +43,34 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => 
                         <View
                             style={[
                                 styles.stepCircle,
-                                isCompleted && styles.circleCompleted,
-                                isActive && styles.circleActive,
+                                {
+                                    backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
+                                    borderColor: isDark ? '#4B5563' : '#CBD5E1',
+                                },
+                                isCompleted && {
+                                    backgroundColor: isDark ? '#33EFA5' : '#283593',
+                                    borderColor: isDark ? '#33EFA5' : '#283593',
+                                },
+                                isActive && {
+                                    backgroundColor: isDark ? '#FFB74D' : '#FF8C00',
+                                    borderColor: isDark ? '#FFB74D' : '#FF8C00',
+                                },
                             ]}
                         >
                             {isCompleted ? (
-                                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                                <Ionicons
+                                    name="checkmark"
+                                    size={16}
+                                    color={isDark ? '#121826' : '#FFFFFF'}
+                                />
                             ) : (
                                 <Text
                                     style={[
                                         styles.stepNumber,
-                                        (isCompleted || isActive) && styles.stepNumberActive,
+                                        { color: isDark ? '#9CA3AF' : '#94A3B8' },
+                                        (isCompleted || isActive) && {
+                                            color: isDark && isActive ? '#121826' : '#FFFFFF',
+                                        },
                                     ]}
                                 >
                                     {s.step}
@@ -52,7 +80,11 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => 
                         <Text
                             style={[
                                 styles.stepLabel,
-                                isActive && styles.stepLabelActive,
+                                { color: isDark ? '#9CA3AF' : '#94A3B8' },
+                                isActive && {
+                                    color: isDark ? '#FFB74D' : '#283593',
+                                    fontWeight: '700',
+                                },
                             ]}
                         >
                             {s.label}
@@ -78,14 +110,12 @@ const styles = StyleSheet.create({
         left: 20,
         right: 20,
         height: 3,
-        backgroundColor: '#E2E8F0',
         top: 32,
     },
     activeLine: {
         position: 'absolute',
         left: 20,
         height: 3,
-        backgroundColor: '#FF8C00',
         top: 32,
     },
     stepItem: {
@@ -96,36 +126,17 @@ const styles = StyleSheet.create({
         width: 34,
         height: 34,
         borderRadius: 17,
-        backgroundColor: '#FFFFFF',
         borderWidth: 2,
-        borderColor: '#CBD5E1',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    circleCompleted: {
-        backgroundColor: '#283593',
-        borderColor: '#283593',
-    },
-    circleActive: {
-        backgroundColor: '#FF8C00',
-        borderColor: '#FF8C00',
     },
     stepNumber: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#94A3B8',
-    },
-    stepNumberActive: {
-        color: '#FFFFFF',
     },
     stepLabel: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#94A3B8',
         marginTop: 6,
-    },
-    stepLabelActive: {
-        color: '#283593',
-        fontWeight: '700',
     },
 });

@@ -2,6 +2,7 @@
   "expo": {
     "name": "expertoya-movil",
     "slug": "expertoya-movil",
+    "owner": "deveriiks-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

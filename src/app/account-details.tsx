@@ -23,15 +23,15 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 
 export default function AccountDetailsScreen() {
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
   const router = useRouter();
   const { usuario } = useAuth();
   const insets = useSafeAreaInsets();
@@ -630,6 +630,27 @@ export default function AccountDetailsScreen() {
             pathname: "/create-service",
             params: { serviceId: srv.id },
           });
+        }}
+        onDeleteService={(srv) => {
+          Alert.alert(
+            "Eliminar Servicio",
+            `¿Estás seguro de que deseas eliminar "${srv.titulo_servicio}"? Esta acción no se puede deshacer.`,
+            [
+              { text: "Cancelar", style: "cancel" },
+              {
+                text: "Eliminar",
+                style: "destructive",
+                onPress: async () => {
+                  try {
+                    await deleteService(srv.id);
+                    setSelectedServiceForDetail(null);
+                  } catch (err: any) {
+                    Alert.alert("Error", "No se pudo eliminar el servicio.");
+                  }
+                },
+              },
+            ],
+          );
         }}
       />
     </View>

@@ -6,13 +6,13 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 import { ServicioPublicadoItem } from "@/types/service";
 
 interface ServiceDetailModalProps {
@@ -22,6 +22,7 @@ interface ServiceDetailModalProps {
   isClientView?: boolean;
   onBookService?: (service: ServicioPublicadoItem) => void;
   onEditService?: (service: ServicioPublicadoItem) => void;
+  onDeleteService?: (service: ServicioPublicadoItem) => void;
 }
 
 export default function ServiceDetailModal({
@@ -31,11 +32,11 @@ export default function ServiceDetailModal({
   isClientView = true,
   onBookService,
   onEditService,
+  onDeleteService,
 }: ServiceDetailModalProps) {
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
 
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
   const [imgError, setImgError] = useState(false);
@@ -59,7 +60,6 @@ export default function ServiceDetailModal({
           { backgroundColor: isDark ? "#121826" : "#FDFCF4" },
         ]}
       >
-        {/* Header con botón de cerrar */}
         <View
           style={[
             styles.headerRow,
@@ -97,10 +97,9 @@ export default function ServiceDetailModal({
 
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={{ paddingBottom: 180 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Galería de Fotos del Trabajo Terminado */}
           <View style={styles.galleryContainer}>
             {activeImage && !imgError ? (
               <View style={styles.mainImageWrapper}>
@@ -142,7 +141,6 @@ export default function ServiceDetailModal({
               </View>
             )}
 
-            {/* Miniaturas navegables si hay más de 1 foto */}
             {fotos.length > 1 && (
               <View style={styles.thumbnailsRow}>
                 {fotos.map((uri, idx) => (
@@ -155,8 +153,8 @@ export default function ServiceDetailModal({
                           activePhotoIdx === idx
                             ? colors.primary
                             : isDark
-                            ? "#374151"
-                            : "#E2E8F0",
+                              ? "#374151"
+                              : "#E2E8F0",
                       },
                     ]}
                     onPress={() => setActivePhotoIdx(idx)}
@@ -169,7 +167,6 @@ export default function ServiceDetailModal({
             )}
           </View>
 
-          {/* Tarjeta de Información Principal */}
           <View
             style={[
               styles.infoCard,
@@ -179,7 +176,6 @@ export default function ServiceDetailModal({
               },
             ]}
           >
-            {/* Estado y Categoría */}
             <View style={styles.badgeRow}>
               <View
                 style={[
@@ -210,15 +206,15 @@ export default function ServiceDetailModal({
                         ? "rgba(52, 211, 153, 0.15)"
                         : "rgba(16, 185, 129, 0.12)"
                       : isDark
-                      ? "rgba(251, 191, 36, 0.15)"
-                      : "rgba(245, 158, 11, 0.12)",
+                        ? "rgba(251, 191, 36, 0.15)"
+                        : "rgba(245, 158, 11, 0.12)",
                     borderColor: isActivo
                       ? isDark
                         ? "rgba(52, 211, 153, 0.3)"
                         : "rgba(16, 185, 129, 0.25)"
                       : isDark
-                      ? "rgba(251, 191, 36, 0.3)"
-                      : "rgba(245, 158, 11, 0.25)",
+                        ? "rgba(251, 191, 36, 0.3)"
+                        : "rgba(245, 158, 11, 0.25)",
                   },
                 ]}
               >
@@ -231,8 +227,8 @@ export default function ServiceDetailModal({
                         ? "#34D399"
                         : "#10B981"
                       : isDark
-                      ? "#FBBF24"
-                      : "#F59E0B"
+                        ? "#FBBF24"
+                        : "#F59E0B"
                   }
                 />
                 <Text
@@ -244,8 +240,8 @@ export default function ServiceDetailModal({
                           ? "#34D399"
                           : "#10B981"
                         : isDark
-                        ? "#FBBF24"
-                        : "#F59E0B",
+                          ? "#FBBF24"
+                          : "#F59E0B",
                     },
                   ]}
                 >
@@ -254,12 +250,10 @@ export default function ServiceDetailModal({
               </View>
             </View>
 
-            {/* Título Principal */}
             <Text style={[styles.serviceTitle, { color: colors.text }]}>
               {service.titulo_servicio}
             </Text>
 
-            {/* Fila de Métricas Clave (Tarifa y Duración) */}
             <View
               style={[
                 styles.highlightMetricsRow,
@@ -306,7 +300,6 @@ export default function ServiceDetailModal({
               </View>
             </View>
 
-            {/* Descripción Completa Comercial */}
             <View style={styles.descriptionSection}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 Descripción del Trabajo
@@ -322,7 +315,6 @@ export default function ServiceDetailModal({
               </Text>
             </View>
 
-            {/* Badge de Seguridad y Garantía ExpertoYa */}
             <View
               style={[
                 styles.securityBanner,
@@ -363,7 +355,6 @@ export default function ServiceDetailModal({
           </View>
         </ScrollView>
 
-        {/* Barra Inferior Sticky con Llamados a la Acción */}
         <View
           style={[
             styles.bottomStickyBar,
@@ -401,6 +392,26 @@ export default function ServiceDetailModal({
             </TouchableOpacity>
           ) : (
             <View style={styles.proActionButtonsRow}>
+              {onDeleteService && (
+                <TouchableOpacity
+                  style={[
+                    styles.deleteSquareBtn,
+                    {
+                      borderColor: isDark ? "rgba(239, 68, 68, 0.4)" : "rgba(239, 68, 68, 0.3)",
+                      backgroundColor: isDark ? "rgba(239, 68, 68, 0.1)" : "#FEF2F2",
+                    },
+                  ]}
+                  onPress={() => {
+                    onClose();
+                    onDeleteService(service);
+                  }}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Eliminar este servicio"
+                >
+                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={[
                   styles.secondaryOutlineBtn,
@@ -423,7 +434,7 @@ export default function ServiceDetailModal({
                 <TouchableOpacity
                   style={[
                     styles.primaryCtaButton,
-                    { backgroundColor: colors.primary, flex: 1.5 },
+                    { backgroundColor: colors.primary, flex: 2 },
                   ]}
                   onPress={() => {
                     onClose();
@@ -432,7 +443,9 @@ export default function ServiceDetailModal({
                   activeOpacity={0.8}
                 >
                   <Ionicons name="create-outline" size={18} color="#FFFFFF" />
-                  <Text style={styles.primaryCtaText}>Editar Servicio</Text>
+                  <Text style={styles.primaryCtaText} numberOfLines={1}>
+                    Editar Servicio
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -688,6 +701,14 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
+  },
+  deleteSquareBtn: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    borderWidth: 1.5,
   },
   proActionButtonsRow: {
     flexDirection: "row",

@@ -9,22 +9,22 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/hooks/use-theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 
 export default function PaymentsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
   const { usuario } = useAuth();
 
   const admin = isAdmin(usuario?.rol);
   const showProSection = admin || isProfesional(usuario?.rol);
   const showClientSection = admin || isCliente(usuario?.rol);
-
-  const colors = Colors[scheme === "dark" ? "dark" : "light"];
 
   const PaymentOption = ({
     icon,
