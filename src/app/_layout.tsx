@@ -1,3 +1,8 @@
+import { getToken, saveToken } from "@/utils/secureStore";
+import * as Location from "expo-location";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
+
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import {
   AccessibilityProvider,
@@ -12,8 +17,6 @@ import {
   useRouter,
   useSegments,
 } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -23,7 +26,7 @@ function AuthGate() {
   const router = useRouter();
 
   useEffect(() => {
-    if (isLoading) return; 
+    if (isLoading) return;
 
     const primero = segments[0] as string | undefined;
     const pantallasPublicas = [
@@ -46,6 +49,24 @@ function AuthGate() {
 
 function RootNavigation() {
   const { isDarkMode } = useAccessibility();
+
+  useEffect(() => {
+    const pedirPermisoUbicacionInicial = async () => {
+      try {
+        const yaSolicitado = await getToken("location_permission_requested");
+        if (!yaSolicitado) {
+          await Location.requestForegroundPermissionsAsync();
+          await saveToken("location_permission_requested", "true");
+        }
+      } catch (err) {
+        console.warn(
+          "No se pudo solicitar permiso de ubicación en inicio:",
+          err,
+        );
+      }
+    };
+    pedirPermisoUbicacionInicial();
+  }, []);
 
   return (
     <ThemeProvider value={isDarkMode ? DarkTheme : DefaultTheme}>

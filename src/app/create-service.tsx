@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -37,13 +37,14 @@ const FONT_FAMILY = Platform.select({
 });
 
 const FALLBACK_OFICIOS: OficioOption[] = [
-  { id: 1, nombre_oficio: "Electricista" },
-  { id: 2, nombre_oficio: "Plomero" },
-  { id: 3, nombre_oficio: "Gasista" },
+  { id: 1, nombre_oficio: "Plomero" },
+  { id: 2, nombre_oficio: "Gasista Matriculado" },
+  { id: 3, nombre_oficio: "Electricista" },
   { id: 4, nombre_oficio: "Pintor" },
   { id: 5, nombre_oficio: "Cerrajero" },
   { id: 6, nombre_oficio: "Refrigeración" },
   { id: 7, nombre_oficio: "Albañilería" },
+  { id: 8, nombre_oficio: "Carpintero" },
 ];
 
 const SUGGESTED_DURATIONS = [
@@ -73,6 +74,9 @@ export default function CreateServiceModal() {
   const [servicioActivo, setServicioActivo] = useState(true);
 
   const [oficios, setOficios] = useState<OficioOption[]>(FALLBACK_OFICIOS);
+  const [approvedOficios, setApprovedOficios] = useState<OficioOption[]>([]);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -87,6 +91,20 @@ export default function CreateServiceModal() {
   const [aiElapsedSeconds, setAiElapsedSeconds] = useState(0);
   const [aiGeneratedSuccess, setAiGeneratedSuccess] = useState(false);
   const aiTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const approvedIds = useMemo(() => {
+    return new Set(approvedOficios.map((o) => o.id));
+  }, [approvedOficios]);
+
+  const displayOficios = useMemo(() => {
+    if (approvedOficios.length === 0) return oficios;
+    return [...oficios].sort((a, b) => {
+      const aApp = approvedIds.has(a.id) ? 1 : 0;
+      const bApp = approvedIds.has(b.id) ? 1 : 0;
+      return bApp - aApp;
+    });
+  }, [oficios, approvedIds, approvedOficios.length]);
+
   useEffect(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
       const handleOnline = () => setIsOnline(true);
@@ -112,23 +130,45 @@ export default function CreateServiceModal() {
 
   useEffect(() => {
     let isMounted = true;
-    const fetchOficios = async () => {
+    const loadInitialData = async () => {
       try {
-        const res = await apiClient("/api/professionals/oficios");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0 && isMounted) {
-            setOficios(data);
+        setLoadingProfile(true);
+        const resOficios = await apiClient("/api/professionals/oficios");
+        if (resOficios.ok) {
+          const dataOficios = await resOficios.json();
+          if (Array.isArray(dataOficios) && dataOficios.length > 0 && isMounted) {
+            setOficios(dataOficios);
           }
         }
-      } catch {
+
+        const resProfile = await apiClient("/api/professionals/profile");
+        if (resProfile.ok) {
+          const proData = await resProfile.json();
+          if (Array.isArray(proData.oficios) && proData.oficios.length > 0 && isMounted) {
+            const userApproved: OficioOption[] = proData.oficios.map((o: any) => ({
+              id: Number(o.id),
+              nombre_oficio: o.nombre_oficio || o.nombre || `Oficio ${o.id}`,
+              descripcion_oficio: o.descripcion_oficio || null,
+            }));
+            setApprovedOficios(userApproved);
+
+            if (!params.serviceId && userApproved.length > 0) {
+              setSelectedOficioId(userApproved[0].id);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Error cargando oficios o perfil profesional:", err);
+      } finally {
+        if (isMounted) setLoadingProfile(false);
       }
     };
-    fetchOficios();
+
+    loadInitialData();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [params.serviceId]);
 
   useEffect(() => {
     if (params.serviceId) {
@@ -159,6 +199,27 @@ export default function CreateServiceModal() {
     }
   };
 
+  const resolveImageUri = async (asset: ImagePicker.ImagePickerAsset): Promise<string> => {
+    if (asset.base64) {
+      return `data:image/jpeg;base64,${asset.base64}`;
+    }
+    if (Platform.OS === "web" && asset.uri && asset.uri.startsWith("blob:")) {
+      try {
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => resolve(asset.uri);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        return asset.uri;
+      }
+    }
+    return asset.uri;
+  };
+
   const handlePickFromGallery = async () => {
     if (fotos.length >= 3) {
       Alert.alert(
@@ -183,10 +244,12 @@ export default function CreateServiceModal() {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setFotos((prev) => [...prev, result.assets[0].uri]);
+        const resolvedUri = await resolveImageUri(result.assets[0]);
+        setFotos((prev) => [...prev, resolvedUri]);
       }
     } catch (err) {
       console.error("Error al seleccionar imagen:", err);
@@ -217,10 +280,12 @@ export default function CreateServiceModal() {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setFotos((prev) => [...prev, result.assets[0].uri]);
+        const resolvedUri = await resolveImageUri(result.assets[0]);
+        setFotos((prev) => [...prev, resolvedUri]);
       }
     } catch (err) {
       console.error("Error al tomar foto:", err);
@@ -230,6 +295,16 @@ export default function CreateServiceModal() {
 
   const handleRemovePhoto = (indexToRemove: number) => {
     setFotos((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const PALABRAS_OFENSIVAS = [
+    "estafa", "robo", "trucho", "ilegal", "incompetente", "mierda", "puto", "puta",
+    "estafador", "tonto", "estupido", "tarado", "pelotudo", "garca", "chanta"
+  ];
+
+  const contieneLenguajeInapropiado = (texto: string): boolean => {
+    const limpio = texto.toLowerCase();
+    return PALABRAS_OFENSIVAS.some((palabra) => limpio.includes(palabra));
   };
 
   const handleGenerateAIDescription = () => {
@@ -247,6 +322,15 @@ export default function CreateServiceModal() {
         "Título requerido",
         "Por favor escribe el título del servicio antes de generar la descripción.",
         [{ text: "Completar Título", style: "default" }],
+      );
+      return;
+    }
+
+    if (contieneLenguajeInapropiado(title)) {
+      Alert.alert(
+        "Contenido no permitido",
+        "El título ingresado contiene términos o lenguaje inapropiado detectado por los filtros de seguridad de la IA. Por favor corrígelo para continuar.",
+        [{ text: "Entendido", style: "default" }]
       );
       return;
     }
@@ -318,6 +402,15 @@ export default function CreateServiceModal() {
       return;
     }
 
+    if (contieneLenguajeInapropiado(title) || contieneLenguajeInapropiado(description)) {
+      Alert.alert(
+        "Contenido no permitido",
+        "El título o la descripción contiene términos no permitidos o lenguaje inapropiado. Por favor corrígelo para continuar.",
+        [{ text: "Entendido", style: "default" }]
+      );
+      return;
+    }
+
     const numericPrice = parseFloat(price.replace(/[^0-9.]/g, ""));
     if (isNaN(numericPrice) || numericPrice <= 0) {
       Alert.alert(
@@ -331,6 +424,14 @@ export default function CreateServiceModal() {
       Alert.alert(
         "Campo Obligatorio",
         "Indica el tiempo o duración estimada del trabajo.",
+      );
+      return;
+    }
+
+    if (approvedOficios.length > 0 && !approvedIds.has(selectedOficioId)) {
+      Alert.alert(
+        "Oficio No Habilitado",
+        "Solo puedes crear o editar servicios en oficios que tengas aprobados en tu perfil profesional.",
       );
       return;
     }
@@ -666,47 +767,122 @@ export default function CreateServiceModal() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text
-                  style={[
-                    styles.label,
-                    { color: isDark ? "#FDFCF4" : "#283593" },
-                  ]}
-                >
-                  Categoría / Oficio <Text style={styles.requiredAsterisk}>*</Text>
-                </Text>
+                <View style={styles.labelWithActionRow}>
+                  <Text
+                    style={[
+                      styles.label,
+                      { color: isDark ? "#FDFCF4" : "#283593" },
+                    ]}
+                  >
+                    Categoría / Oficio <Text style={styles.requiredAsterisk}>*</Text>
+                  </Text>
+                  {approvedOficios.length > 0 && (
+                    <View
+                      style={[
+                        styles.approvedBadge,
+                        {
+                          backgroundColor: isDark
+                            ? "rgba(52, 211, 153, 0.15)"
+                            : "rgba(16, 185, 129, 0.12)",
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="shield-checkmark"
+                        size={12}
+                        color={isDark ? "#34D399" : "#10B981"}
+                      />
+                      <Text
+                        style={[
+                          styles.approvedBadgeText,
+                          { color: isDark ? "#34D399" : "#10B981" },
+                        ]}
+                      >
+                        {approvedOficios.length} oficio{approvedOficios.length !== 1 ? "s" : ""} habilitado{approvedOficios.length !== 1 ? "s" : ""}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {approvedOficios.length === 0 && !loadingProfile && (
+                  <View
+                    style={[
+                      styles.noApprovedNotice,
+                      {
+                        backgroundColor: isDark ? "#451A03" : "#FFFBEB",
+                        borderColor: isDark ? "#F59E0B" : "#FBBF24",
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="warning-outline"
+                      size={16}
+                      color={isDark ? "#FBBF24" : "#D97706"}
+                    />
+                    <Text
+                      style={[
+                        styles.noApprovedNoticeText,
+                        { color: isDark ? "#FDE68A" : "#92400E" },
+                      ]}
+                    >
+                      Aún no tienes oficios aprobados en tu perfil profesional.
+                      Debes tener al menos un oficio acreditado para publicar servicios.
+                    </Text>
+                  </View>
+                )}
+
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.oficiosRow}
                 >
-                  {oficios.map((oficio) => {
-                    const isSelected = oficio.id === selectedOficioId;
+                  {displayOficios.map((oficio) => {
+                    const isApproved =
+                      approvedOficios.length === 0 || approvedIds.has(oficio.id);
+                    const isSelected = isApproved && oficio.id === selectedOficioId;
+
                     return (
                       <TouchableOpacity
                         key={oficio.id}
+                        disabled={!isApproved}
                         style={[
                           styles.oficioChip,
-                          {
-                            borderColor: isSelected
-                              ? isDark
-                                ? "#FFB74D"
-                                : "#FF8C00"
-                              : isDark
-                                ? "#374151"
-                                : "#E2E8F0",
-                            backgroundColor: isSelected
-                              ? isDark
-                                ? "rgba(255, 183, 77, 0.2)"
-                                : "rgba(255, 140, 0, 0.12)"
-                              : isDark
-                                ? "#121826"
-                                : "#FDFCF4",
+                          !isApproved && styles.oficioChipDisabled,
+                          isApproved && isSelected && {
+                            borderColor: isDark ? "#FFB74D" : "#FF8C00",
+                            backgroundColor: isDark
+                              ? "rgba(255, 183, 77, 0.2)"
+                              : "rgba(255, 140, 0, 0.12)",
+                          },
+                          isApproved && !isSelected && {
+                            borderColor: isDark ? "#374151" : "#E2E8F0",
+                            backgroundColor: isDark ? "#121826" : "#FDFCF4",
+                          },
+                          !isApproved && {
+                            borderColor: isDark ? "#2A3649" : "#E2E8F0",
+                            backgroundColor: isDark ? "#161E2E" : "#F1F5F9",
                           },
                         ]}
-                        onPress={() => setSelectedOficioId(oficio.id)}
-                        activeOpacity={0.7}
+                        onPress={() => {
+                          if (!isApproved) {
+                            Alert.alert(
+                              "Oficio No Aprobado",
+                              "Solo puedes publicar servicios en oficios que ya tienes aprobados en tu perfil.",
+                            );
+                            return;
+                          }
+                          setSelectedOficioId(oficio.id);
+                        }}
+                        activeOpacity={isApproved ? 0.7 : 1}
                       >
-                        {isSelected && (
+                        {!isApproved && (
+                          <Ionicons
+                            name="lock-closed"
+                            size={12}
+                            color={isDark ? "#64748B" : "#94A3B8"}
+                          />
+                        )}
+                        {isApproved && isSelected && (
                           <Ionicons
                             name="checkmark-circle"
                             size={14}
@@ -716,19 +892,22 @@ export default function CreateServiceModal() {
                         <Text
                           style={[
                             styles.oficioChipText,
-                            {
-                              color: isSelected
-                                ? isDark
-                                  ? "#FFB74D"
-                                  : "#FF8C00"
-                                : isDark
-                                  ? "#FDFCF4"
-                                  : "#283593",
-                              fontWeight: isSelected ? "700" : "500",
+                            !isApproved && {
+                              color: isDark ? "#64748B" : "#94A3B8",
+                              fontWeight: "400",
+                            },
+                            isApproved && isSelected && {
+                              color: isDark ? "#FFB74D" : "#FF8C00",
+                              fontWeight: "700",
+                            },
+                            isApproved && !isSelected && {
+                              color: isDark ? "#FDFCF4" : "#283593",
+                              fontWeight: "500",
                             },
                           ]}
                         >
                           {oficio.nombre_oficio}
+                          {!isApproved && " (No habilitado)"}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -1715,6 +1894,38 @@ const styles = StyleSheet.create({
   oficioChipText: {
     fontFamily: FONT_FAMILY,
     fontSize: 13,
+  },
+  oficioChipDisabled: {
+    opacity: 0.5,
+    borderStyle: "dashed",
+  },
+  approvedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  approvedBadgeText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  noApprovedNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  noApprovedNoticeText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 12,
+    fontWeight: "500",
+    flex: 1,
   },
   suggestedDurationContainer: {
     marginTop: -8,

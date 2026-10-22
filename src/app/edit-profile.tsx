@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
+import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -43,15 +44,99 @@ const ZONAS_SUGERIDAS = [
   "Villa Regina",
 ];
 
-const OFICIOS_DISPONIBLES = [
-  { id: 1, nombre: "Electricista" },
-  { id: 2, nombre: "Plomero" },
-  { id: 3, nombre: "Gasista" },
-  { id: 4, nombre: "Pintor" },
-  { id: 5, nombre: "Cerrajero" },
-  { id: 6, nombre: "Refrigeración" },
-  { id: 7, nombre: "Albañilería" },
+export interface OficioItem {
+  id: number;
+  nombre: string;
+  nombre_oficio?: string;
+  descripcion_oficio?: string;
+  requiresLicense: boolean;
+  licenseAuthority?: string;
+}
+
+export const OFICIOS_CATALOGO: OficioItem[] = [
+  { id: 1, nombre: "Plomero", requiresLicense: false },
+  {
+    id: 2,
+    nombre: "Gasista Matriculado",
+    requiresLicense: true,
+    licenseAuthority: "Carnet habilitante de Camuzzi Gas del Sur",
+  },
+  {
+    id: 3,
+    nombre: "Electricista",
+    requiresLicense: true,
+    licenseAuthority: "Matrícula habilitante EPEN / CALF",
+  },
+  { id: 4, nombre: "Pintor", requiresLicense: false },
+  { id: 5, nombre: "Cerrajero", requiresLicense: false },
+  { id: 6, nombre: "Refrigeración", requiresLicense: false },
+  { id: 7, nombre: "Albañilería", requiresLicense: false },
+  { id: 8, nombre: "Carpintero", requiresLicense: false },
 ];
+
+export const isLicenseRequired = (oficio?: OficioItem | null): boolean => {
+  if (!oficio) return false;
+  if (oficio.requiresLicense) return true;
+  if (oficio.id === 2 || oficio.id === 3) return true;
+  const name = (oficio.nombre_oficio || oficio.nombre || "").toLowerCase();
+  return (
+    name.includes("gasista") ||
+    name.includes("electricista") ||
+    name.includes("matriculad")
+  );
+};
+
+export const mapBackendOficiosToIds = (
+  rawOficios: any,
+  catalog: OficioItem[],
+): number[] => {
+  if (!rawOficios) return [];
+  const list = Array.isArray(rawOficios) ? rawOficios : [rawOficios];
+  const ids: number[] = [];
+
+  for (const item of list) {
+    if (typeof item === "number") {
+      ids.push(item);
+    } else if (typeof item === "object" && item !== null) {
+      if (typeof item.id === "number") {
+        ids.push(item.id);
+      } else if (item.nombre_oficio || item.nombre) {
+        const nameToMatch = (item.nombre_oficio || item.nombre || "")
+          .toLowerCase()
+          .trim();
+        const found = catalog.find(
+          (c) =>
+            c.nombre.toLowerCase().trim() === nameToMatch ||
+            (c.nombre_oficio &&
+              c.nombre_oficio.toLowerCase().trim() === nameToMatch) ||
+            nameToMatch.includes(c.nombre.toLowerCase().trim()) ||
+            c.nombre.toLowerCase().trim().includes(nameToMatch),
+        );
+        if (found) ids.push(found.id);
+      }
+    } else if (typeof item === "string") {
+      const trimmed = item.trim();
+      const num = Number(trimmed);
+      if (!isNaN(num) && num > 0) {
+        ids.push(num);
+      } else {
+        const str = trimmed.toLowerCase();
+        const found = catalog.find(
+          (c) =>
+            c.nombre.toLowerCase().includes(str) ||
+            str.includes(c.nombre.toLowerCase()) ||
+            (str === "plumber" && c.id === 1) ||
+            (str === "gas_fitter" && c.id === 2) ||
+            (str === "electrician" && c.id === 3) ||
+            (str === "painter" && c.id === 4),
+        );
+        if (found) ids.push(found.id);
+      }
+    }
+  }
+
+  return Array.from(new Set(ids));
+};
 
 const DIAS_SEMANA_DEFAULT = [
   { dia_semana: 1, nombre: "Lunes", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
@@ -151,108 +236,43 @@ export default function EditProfileScreen() {
     }
   };
 
-  const handleSave = async () => {
-    if (!nombre.trim() || !apellido.trim()) {
-      Alert.alert(
-        "Campos obligatorios",
-        "Por favor ingresa tu nombre y apellido.",
-      );
-      return;
-    }
-
-    if (selectedOficios.length === 0) {
-      Alert.alert(
-        "Oficio requerido",
-        "Por favor selecciona al menos una especialidad u oficio.",
-      );
-      return;
-    }
-
-    if (showProFields) {
-      const hayHorarioInvalido = dias.some(
-        (d) => d.activo && d.hora_inicio >= d.hora_fin,
-      );
-      if (hayHorarioInvalido) {
-        Alert.alert(
-          "Horario inválido",
-          "Por favor verifica que la hora de finalización sea posterior a la de inicio en todos los días activos.",
-        );
-        return;
-      }
-    }
-
-    setIsSaving(true);
-
-    try {
-      const isEphemeralUri =
-        avatarUri.startsWith("blob:") || avatarUri.startsWith("file://");
-
-      const payload = {
-        nombre: nombre.trim(),
-        apellido: apellido.trim(),
-        telefono: telefono.trim(),
-        foto_perfil: isEphemeralUri ? undefined : avatarUri,
-        descripcion_perfil: bio.trim(),
-        ubicacion_geografica: zonasCobertura.trim(),
-        disponible,
-      };
-
-      const endpoint = isCliente(usuario?.rol)
-        ? "/api/auth/profile"
-        : "/api/professionals/profile";
-
-      const response = await apiClient(endpoint, {
-        method: "PUT",
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        if (showProFields) {
-          const horariosActivos = dias
-            .filter((d) => d.activo)
-            .map((d) => ({
-              dia_semana: d.dia_semana,
-              hora_inicio: d.hora_inicio,
-              hora_fin: d.hora_fin,
-            }));
-
-          await apiClient("/api/professionals/availability", {
-            method: "PUT",
-            body: JSON.stringify({ horarios: horariosActivos }),
-          });
-        }
-
-        Alert.alert(
-          "¡Perfil Actualizado!",
-          "Tus cambios han sido guardados exitosamente.",
-          [{ text: "Aceptar", onPress: () => router.back() }],
-        );
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        Alert.alert(
-          "Error al actualizar",
-          errorData.error ||
-          "Hubo un problema al guardar los datos en el servidor.",
-          [{ text: "Aceptar" }],
-        );
-      }
-    } catch (error) {
-      console.warn("Error de conexión:", error);
-      Alert.alert(
-        "Error de red",
-        "No se pudo conectar con el servidor. Verifica tu conexión a internet.",
-        [{ text: "Aceptar" }],
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const [avatarUri, setAvatarUri] = useState<string>(DEFAULT_AVATAR);
-
   const [zonasCobertura, setZonasCobertura] = useState(
     "Neuquén, Cipolletti, Plottier",
   );
+  const [nombre, setNombre] = useState(usuario?.nombre || "");
+  const [apellido, setApellido] = useState(usuario?.apellido || "");
+  const [telefono, setTelefono] = useState("");
+  const [bio, setBio] = useState("");
+  const [aniosExperiencia, setAniosExperiencia] = useState("");
+  const [disponible, setDisponible] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [oficiosList, setOficiosList] = useState<OficioItem[]>(OFICIOS_CATALOGO);
+  const [selectedOficios, setSelectedOficios] = useState<number[]>([]);
+  const [originalOficios, setOriginalOficios] = useState<number[]>([]);
+  const [attachedDoc, setAttachedDoc] = useState<{
+    uri: string;
+    name: string;
+    mimeType: string;
+    size?: number;
+  } | null>(null);
+  const [existingMatriculaUrl, setExistingMatriculaUrl] = useState<string | null>(null);
+  const [pendingOficiosIds, setPendingOficiosIds] = useState<number[]>([]);
+
+  const newOficiosRequiringLicense = useMemo(() => {
+    return selectedOficios.filter((id) => {
+      const isNew = !originalOficios.includes(id);
+      const info = oficiosList.find((o) => o.id === id);
+      return isNew && isLicenseRequired(info);
+    });
+  }, [selectedOficios, originalOficios, oficiosList]);
+
+  const isSaveBlocked =
+    newOficiosRequiringLicense.length > 0 &&
+    !attachedDoc &&
+    !existingMatriculaUrl;
 
   const handleAddZona = (zona: string) => {
     if (!zonasCobertura.toLowerCase().includes(zona.toLowerCase())) {
@@ -262,13 +282,86 @@ export default function EditProfileScreen() {
     }
   };
 
-  const [nombre, setNombre] = useState(usuario?.nombre || "");
-  const [apellido, setApellido] = useState(usuario?.apellido || "");
-  const [telefono, setTelefono] = useState("");
-  const [bio, setBio] = useState("");
-  const [disponible, setDisponible] = useState(true);
-  const [showPreview, setShowPreview] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const handlePickDocument = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+        copyToCacheDirectory: true,
+      });
+
+      if (!res.canceled && res.assets && res.assets[0]) {
+        const asset = res.assets[0];
+        const fileName = asset.name || "matricula_profesional.pdf";
+        const isPdf =
+          asset.mimeType?.includes("pdf") ||
+          fileName.toLowerCase().endsWith(".pdf");
+
+        if (!isPdf) {
+          Alert.alert(
+            "Formato inválido",
+            "Únicamente se permite adjuntar documentación en formato PDF.",
+          );
+          return;
+        }
+
+        setAttachedDoc({
+          uri: asset.uri,
+          name: fileName,
+          mimeType: "application/pdf",
+          size: asset.size,
+        });
+
+        Alert.alert(
+          "Documentación Adjunta",
+          "Se ha adjuntado tu matrícula correctamente. Estaremos haciéndote llegar las novedades.",
+          [{ text: "Entendido" }],
+        );
+      }
+    } catch (err) {
+      console.error("Error al seleccionar documento PDF:", err);
+      Alert.alert(
+        "Error al seleccionar",
+        "No se pudo cargar el archivo PDF. Por favor intenta nuevamente.",
+      );
+    }
+  };
+
+  const toggleOficio = (oficioId: number) => {
+    const isCurrentlySelected = selectedOficios.includes(oficioId);
+
+    if (isCurrentlySelected) {
+      setSelectedOficios((prev) => prev.filter((id) => id !== oficioId));
+      return;
+    }
+
+    const oficioInfo = oficiosList.find((o) => o.id === oficioId);
+    const isNewTrade = !originalOficios.includes(oficioId);
+    const requiresLicense = isLicenseRequired(oficioInfo);
+
+    if (isNewTrade && requiresLicense) {
+      setSelectedOficios((prev) => [...prev, oficioId]);
+
+      if (!attachedDoc && !existingMatriculaUrl) {
+        Alert.alert(
+          "Documentación Requerida",
+          "Debe adjuntar la documentación correspondiente para que un administrador verifique y apruebe esta matrícula.",
+          [
+            {
+              text: "Adjuntar Documentación",
+              onPress: () => handlePickDocument(),
+            },
+            {
+              text: "Entendido",
+              style: "cancel",
+            },
+          ],
+        );
+      }
+      return;
+    }
+
+    setSelectedOficios((prev) => [...prev, oficioId]);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -285,6 +378,9 @@ export default function EditProfileScreen() {
               setTelefono(data.telefono || "");
               setBio(data.descripcion_perfil || "");
               setZonasCobertura(data.ubicacion_geografica || "");
+              if (data.experiencia !== undefined && data.experiencia !== null) {
+                setAniosExperiencia(String(data.experiencia));
+              }
               if (data.foto_perfil) {
                 const isExpired =
                   data.foto_perfil.startsWith("blob:") ||
@@ -296,6 +392,55 @@ export default function EditProfileScreen() {
               if (data.disponible !== undefined) {
                 setDisponible(Boolean(data.disponible));
               }
+              if (data.matricula_documento) {
+                setExistingMatriculaUrl(data.matricula_documento);
+              }
+
+              if (Array.isArray(data.oficios_pendientes_ids)) {
+                setPendingOficiosIds(data.oficios_pendientes_ids);
+              } else {
+                setPendingOficiosIds([]);
+              }
+
+              // Sincronización precisa de los oficios de la base de datos
+              const rawOficios = data.oficios || data.oficios_ids || [];
+              const parsedIds = mapBackendOficiosToIds(
+                rawOficios,
+                OFICIOS_CATALOGO,
+              );
+              setSelectedOficios(parsedIds);
+              setOriginalOficios(parsedIds);
+            }
+
+            try {
+              const resOficios = await apiClient("/api/professionals/oficios");
+              if (resOficios.ok) {
+                const dataOficios = await resOficios.json();
+                if (Array.isArray(dataOficios) && dataOficios.length > 0) {
+                  const merged: OficioItem[] = dataOficios.map((o: any) => {
+                    const fallback = OFICIOS_CATALOGO.find(
+                      (c) => c.id === Number(o.id),
+                    );
+                    return {
+                      id: Number(o.id),
+                      nombre:
+                        o.nombre_oficio ||
+                        o.nombre ||
+                        fallback?.nombre ||
+                        `Oficio ${o.id}`,
+                      nombre_oficio: o.nombre_oficio,
+                      descripcion_oficio: o.descripcion_oficio,
+                      requiresLicense: fallback
+                        ? fallback.requiresLicense
+                        : isLicenseRequired(o),
+                      licenseAuthority: fallback?.licenseAuthority,
+                    };
+                  });
+                  setOficiosList(merged);
+                }
+              }
+            } catch (errOficios) {
+              console.warn("Error cargando oficios:", errOficios);
             }
 
             const resDispo = await apiClient("/api/professionals/availability");
@@ -340,14 +485,173 @@ export default function EditProfileScreen() {
     }, [usuario]),
   );
 
-  const [selectedOficios, setSelectedOficios] = useState<number[]>([1]);
+  const handleSave = async () => {
+    if (!nombre.trim() || !apellido.trim()) {
+      Alert.alert(
+        "Campos obligatorios",
+        "Por favor ingresa tu nombre y apellido.",
+      );
+      return;
+    }
 
-  const toggleOficio = (oficioId: number) => {
-    setSelectedOficios((prev) =>
-      prev.includes(oficioId)
-        ? prev.filter((id) => id !== oficioId)
-        : [...prev, oficioId],
-    );
+    if (showProFields && selectedOficios.length === 0) {
+      Alert.alert(
+        "Oficio requerido",
+        "Por favor selecciona al menos una especialidad u oficio.",
+      );
+      return;
+    }
+
+    if (showProFields) {
+      const hayHorarioInvalido = dias.some(
+        (d) => d.activo && d.hora_inicio >= d.hora_fin,
+      );
+      if (hayHorarioInvalido) {
+        Alert.alert(
+          "Horario inválido",
+          "Por favor verifica que la hora de finalización sea posterior a la de inicio en todos los días activos.",
+        );
+        return;
+      }
+
+      // Validar si hay oficios nuevos que exijan matrícula y bloquear si falta documentación
+      if (isSaveBlocked) {
+        Alert.alert(
+          "Documentación Requerida",
+          "Debe adjuntar la documentación correspondiente para que un administrador verifique y apruebe esta matrícula.",
+          [
+            {
+              text: "Adjuntar Ahora",
+              onPress: () => handlePickDocument(),
+            },
+            {
+              text: "Entendido",
+              style: "cancel",
+            },
+          ],
+        );
+        return;
+      }
+    }
+
+    setIsSaving(true);
+
+    try {
+      const isEphemeralUri =
+        avatarUri.startsWith("blob:") || avatarUri.startsWith("file://");
+
+      let response: Response;
+
+      if (showProFields && attachedDoc) {
+        const formData = new FormData();
+        formData.append("nombre", nombre.trim());
+        formData.append("apellido", apellido.trim());
+        formData.append("telefono", telefono.trim());
+        if (!isEphemeralUri && avatarUri) {
+          formData.append("foto_perfil", avatarUri);
+        }
+        formData.append("descripcion_perfil", bio.trim());
+        formData.append("ubicacion_geografica", zonasCobertura.trim());
+        formData.append("disponible", String(disponible));
+        if (aniosExperiencia.trim()) {
+          formData.append("experiencia", aniosExperiencia.trim());
+        }
+        formData.append("oficios_ids", JSON.stringify(selectedOficios));
+        if (Platform.OS === "web") {
+          try {
+            const resBlob = await fetch(attachedDoc.uri);
+            const blob = await resBlob.blob();
+            const fileName = attachedDoc.name || "matricula_profesional.pdf";
+            formData.append("matricula_documento", blob, fileName);
+          } catch (blobErr) {
+            console.error("Error al preparar blob de documento en web:", blobErr);
+            (formData as any).append("matricula_documento", {
+              uri: attachedDoc.uri,
+              name: attachedDoc.name || "matricula_profesional.pdf",
+              type: attachedDoc.mimeType || "application/pdf",
+            });
+          }
+        } else {
+          (formData as any).append("matricula_documento", {
+            uri: attachedDoc.uri,
+            name: attachedDoc.name || "matricula_profesional.pdf",
+            type: attachedDoc.mimeType || "application/pdf",
+          });
+        }
+
+        response = await apiClient("/api/professionals/profile", {
+          method: "PUT",
+          body: formData,
+        });
+      } else {
+        const payload: any = {
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
+          telefono: telefono.trim(),
+          foto_perfil: isEphemeralUri ? undefined : avatarUri,
+          descripcion_perfil: bio.trim(),
+          ubicacion_geografica: zonasCobertura.trim(),
+          disponible,
+          ...(aniosExperiencia.trim() ? { experiencia: parseInt(aniosExperiencia.trim(), 10) } : {}),
+        };
+
+        if (showProFields) {
+          payload.oficios_ids = selectedOficios;
+        }
+
+        const endpoint = isCliente(usuario?.rol)
+          ? "/api/auth/profile"
+          : "/api/professionals/profile";
+
+        response = await apiClient(endpoint, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      if (response.ok) {
+        setOriginalOficios(selectedOficios);
+        if (showProFields) {
+          const horariosActivos = dias
+            .filter((d) => d.activo)
+            .map((d) => ({
+              dia_semana: d.dia_semana,
+              hora_inicio: d.hora_inicio,
+              hora_fin: d.hora_fin,
+            }));
+
+          await apiClient("/api/professionals/availability", {
+            method: "PUT",
+            body: JSON.stringify({ horarios: horariosActivos }),
+          });
+        }
+
+        Alert.alert(
+          "¡Perfil Actualizado!",
+          attachedDoc
+            ? "Tus cambios y la documentación de tu matrícula han sido guardados exitosamente. Estaremos haciéndote llegar las novedades."
+            : "Tus cambios han sido guardados exitosamente.",
+          [{ text: "Aceptar", onPress: () => router.back() }],
+        );
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        Alert.alert(
+          "Error al actualizar",
+          errorData.error ||
+          "Hubo un problema al guardar los datos en el servidor.",
+          [{ text: "Aceptar" }],
+        );
+      }
+    } catch (error) {
+      console.warn("Error de conexión:", error);
+      Alert.alert(
+        "Error de red",
+        "No se pudo conectar con el servidor. Verifica tu conexión a internet.",
+        [{ text: "Aceptar" }],
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePickImage = async () => {
@@ -504,25 +808,47 @@ export default function EditProfileScreen() {
                 </View>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>
-                  Teléfono de Contacto
-                </Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.backgroundElement,
-                      borderColor: colors.backgroundSelected,
-                      color: colors.text,
-                    },
-                  ]}
-                  placeholder="+54 9 11..."
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="phone-pad"
-                  value={telefono}
-                  onChangeText={setTelefono}
-                />
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={[styles.label, { color: colors.text }]}>
+                    Teléfono de Contacto
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.backgroundElement,
+                        borderColor: colors.backgroundSelected,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="+54 9 11..."
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="phone-pad"
+                    value={telefono}
+                    onChangeText={setTelefono}
+                  />
+                </View>
+                {showProFields && (
+                  <View style={[styles.inputGroup, { width: 110, marginLeft: 8 }]}>
+                    <Text style={[styles.label, { color: colors.text }]}>Años Exp.</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: colors.backgroundElement,
+                          borderColor: colors.backgroundSelected,
+                          color: colors.text,
+                        },
+                      ]}
+                      placeholder="Ej: 8"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="numeric"
+                      value={aniosExperiencia}
+                      onChangeText={setAniosExperiencia}
+                    />
+                  </View>
+                )}
               </View>
             </View>
 
@@ -729,8 +1055,10 @@ export default function EditProfileScreen() {
                   </Text>
 
                   <View style={styles.chipsContainer}>
-                    {OFICIOS_DISPONIBLES.map((oficio) => {
+                    {oficiosList.map((oficio) => {
                       const isSelected = selectedOficios.includes(oficio.id);
+                      const requiresLic = isLicenseRequired(oficio);
+
                       return (
                         <TouchableOpacity
                           key={oficio.id}
@@ -767,10 +1095,219 @@ export default function EditProfileScreen() {
                           >
                             {oficio.nombre}
                           </Text>
+                          {requiresLic && (
+                            <View
+                              style={[
+                                styles.matriculaChipBadge,
+                                {
+                                  backgroundColor: isSelected
+                                    ? "rgba(255, 255, 255, 0.25)"
+                                    : isDark
+                                      ? "rgba(255, 183, 77, 0.15)"
+                                      : "rgba(255, 140, 0, 0.12)",
+                                },
+                              ]}
+                            >
+                              <Ionicons
+                                name={pendingOficiosIds.includes(oficio.id) ? "time-outline" : "ribbon-outline"}
+                                size={11}
+                                color={
+                                  isSelected
+                                    ? "#FFF"
+                                    : isDark
+                                      ? "#FFB74D"
+                                      : "#FF8C00"
+                                }
+                              />
+                              <Text
+                                style={[
+                                  styles.matriculaChipBadgeText,
+                                  {
+                                    color: isSelected
+                                      ? "#FFF"
+                                      : isDark
+                                        ? "#FFB74D"
+                                        : "#FF8C00",
+                                  },
+                                ]}
+                              >
+                                {pendingOficiosIds.includes(oficio.id) ? "En revisión" : "Matrícula"}
+                              </Text>
+                            </View>
+                          )}
                         </TouchableOpacity>
                       );
                     })}
                   </View>
+
+                  {/* Alerta y flujo para adjuntar documentación de matrícula si hay oficios nuevos requeridos */}
+                  {newOficiosRequiringLicense.length > 0 && (
+                    <View
+                      style={[
+                        styles.licenseNoticeCard,
+                        {
+                          backgroundColor: attachedDoc
+                            ? isDark
+                              ? "rgba(16, 185, 129, 0.1)"
+                              : "#F0FDF4"
+                            : isDark
+                              ? "rgba(245, 158, 11, 0.1)"
+                              : "#FFFBEB",
+                          borderColor: attachedDoc
+                            ? isDark
+                              ? "#10B981"
+                              : "#86EFAC"
+                            : isDark
+                              ? "#F59E0B"
+                              : "#FCD34D",
+                        },
+                      ]}
+                    >
+                      <View style={styles.licenseNoticeHeader}>
+                        <Ionicons
+                          name={
+                            attachedDoc ? "checkmark-circle" : "alert-circle"
+                          }
+                          size={22}
+                          color={
+                            attachedDoc
+                              ? isDark
+                                ? "#34D399"
+                                : "#16A34A"
+                              : isDark
+                                ? "#FBBF24"
+                                : "#D97706"
+                          }
+                        />
+                        <View style={{ flex: 1, marginLeft: 8 }}>
+                          <Text
+                            style={[
+                              styles.licenseNoticeTitle,
+                              {
+                                color: attachedDoc
+                                  ? isDark
+                                    ? "#34D399"
+                                    : "#16A34A"
+                                  : isDark
+                                    ? "#FBBF24"
+                                    : "#B45309",
+                              },
+                            ]}
+                          >
+                            {attachedDoc
+                              ? "Documentación de Matrícula Adjuntada"
+                              : "Documentación Requerida (Matrícula Legal)"}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.licenseNoticeSubtitle,
+                              { color: colors.textSecondary },
+                            ]}
+                          >
+                            {attachedDoc
+                              ? `Archivo listo para verificar: ${attachedDoc.name}`
+                              : "Debe adjuntar la documentación correspondiente para que un administrador verifique y apruebe esta matrícula."}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {attachedDoc ? (
+                        <View style={{ gap: 10 }}>
+                          <View style={styles.attachedFileRow}>
+                            <View style={styles.attachedFileInfo}>
+                              <Ionicons
+                                name="document-text"
+                                size={18}
+                                color={colors.primary}
+                              />
+                              <Text
+                                style={[
+                                  styles.attachedFileName,
+                                  { color: colors.text },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {attachedDoc.name}
+                              </Text>
+                            </View>
+                            <View style={styles.attachedActionsRow}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.changeDocBtn,
+                                  { borderColor: colors.backgroundSelected },
+                                ]}
+                                onPress={handlePickDocument}
+                                activeOpacity={0.7}
+                              >
+                                <Text
+                                  style={[
+                                    styles.changeDocBtnText,
+                                    { color: colors.primary },
+                                  ]}
+                                >
+                                  Cambiar
+                                </Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.removeDocBtn}
+                                onPress={() => setAttachedDoc(null)}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons
+                                  name="trash-outline"
+                                  size={16}
+                                  color={colors.danger || "#EF4444"}
+                                />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+
+                          <TouchableOpacity
+                            style={[
+                              styles.sendDocButton,
+                              { backgroundColor: colors.primary },
+                            ]}
+                            onPress={handleSave}
+                            disabled={isSaving}
+                            activeOpacity={0.8}
+                          >
+                            {isSaving ? (
+                              <ActivityIndicator size="small" color="#FFF" />
+                            ) : (
+                              <>
+                                <Ionicons
+                                  name="paper-plane"
+                                  size={16}
+                                  color="#FFF"
+                                />
+                                <Text style={styles.sendDocButtonText}>
+                                  Enviar Documentación para Validación
+                                </Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            styles.uploadLicenseButton,
+                            { backgroundColor: colors.primary },
+                          ]}
+                          onPress={handlePickDocument}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons
+                            name="cloud-upload-outline"
+                            size={18}
+                            color="#FFF"
+                          />
+                          <Text style={styles.uploadLicenseButtonText}>
+                            Adjuntar Matrícula (PDF)
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </View>
 
                 {/* Sección 3: Zonas de Cobertura */}
@@ -1055,7 +1592,7 @@ export default function EditProfileScreen() {
                 styles.saveButton,
                 {
                   backgroundColor: colors.primary,
-                  opacity: isSaving ? 0.7 : 1,
+                  opacity: isSaving || isSaveBlocked ? 0.75 : 1,
                 },
               ]}
               onPress={handleSave}
@@ -1072,11 +1609,19 @@ export default function EditProfileScreen() {
               ) : (
                 <View style={styles.savingRow}>
                   <Ionicons
-                    name="checkmark-circle-outline"
+                    name={
+                      isSaveBlocked
+                        ? "lock-closed-outline"
+                        : "checkmark-circle-outline"
+                    }
                     size={22}
                     color="#FFF"
                   />
-                  <Text style={styles.saveButtonText}>Guardar Cambios</Text>
+                  <Text style={styles.saveButtonText}>
+                    {isSaveBlocked
+                      ? "Adjuntar Matrícula para Guardar"
+                      : "Guardar Cambios"}
+                  </Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -1103,9 +1648,9 @@ export default function EditProfileScreen() {
         fotoPerfil={getSafeAvatarUri(avatarUri)}
         bio={bio}
         zonasCobertura={zonasCobertura}
+        aniosExperiencia={aniosExperiencia}
         oficiosNombres={selectedOficios.map(
-          (id) =>
-            OFICIOS_DISPONIBLES.find((o) => o.id === id)?.nombre || "Oficio",
+          (id) => oficiosList.find((o) => o.id === id)?.nombre || "Oficio",
         )}
       />
     </KeyboardAvoidingView>
@@ -1410,6 +1955,110 @@ const styles = StyleSheet.create({
   },
   previewButtonText: {
     fontSize: 15,
+    fontWeight: "700",
+  },
+  matriculaChipBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 6,
+  },
+  matriculaChipBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  licenseNoticeCard: {
+    borderWidth: 1.5,
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 14,
+    gap: 12,
+  },
+  licenseNoticeHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  licenseNoticeTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  licenseNoticeSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  uploadLicenseButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  uploadLicenseButtonText: {
+    color: "#FFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  attachedFileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(0,0,0,0.03)",
+    padding: 10,
+    borderRadius: 10,
+  },
+  attachedFileInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+    marginRight: 8,
+  },
+  attachedFileName: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    flex: 1,
+  },
+  attachedActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  changeDocBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  changeDocBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  removeDocBtn: {
+    padding: 4,
+  },
+  sendDocButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sendDocButtonText: {
+    color: "#FFF",
+    fontSize: 14,
     fontWeight: "700",
   },
 });
