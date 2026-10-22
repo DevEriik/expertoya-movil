@@ -1,194 +1,35 @@
 import { useAccessibility } from "@/context/AccessibilityContext";
 import { useTheme } from "@/hooks/use-theme";
+import { useDiagnosticoIA } from "@/hooks/useDiagnosticoIA";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   Image,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-
-function enviarMultipart(url: string, formData: FormData) {
-  return new Promise<{ status: number; data: any }>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", url);
-    xhr.setRequestHeader("Accept", "application/json");
-    xhr.timeout = 90000; // 90 segundos: Gemini puede tardar
-    xhr.onload = () => {
-      let data: any = null;
-      try {
-        data = JSON.parse(xhr.responseText);
-      } catch {}
-      resolve({ status: xhr.status, data });
-    };
-    xhr.onerror = () => reject(new Error("Network request failed"));
-    xhr.ontimeout = () => reject(new Error("Tiempo de espera agotado"));
-    xhr.send(formData as any);
-  });
-}
+import { ResultadosIA } from "./ResultadosIA";
 
 export function HeroIA() {
   const colors = useTheme();
   const { isDarkMode, highContrast, voiceDictation, scaleFont } =
     useAccessibility();
 
-  // Estados originales del equipo
-  const [promptText, setPromptText] = useState("");
-  const [isListening, setIsListening] = useState(false);
-
-  // Estados de la IA
-  const [isLoading, setIsLoading] = useState(false);
-  const [oficios, setOficios] = useState<string[]>([]);
-  const [imagenSeleccionada, setImagenSeleccionada] =
-    useState<ImagePicker.ImagePickerAsset | null>(null);
-
-  // En Android, al abrir la cámara el sistema puede cerrar la app para liberar
-  // memoria. Si pasa, al volver recuperamos la foto que se había sacado.
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-
-    ImagePicker.getPendingResultAsync()
-      .then((result) => {
-        if (
-          result &&
-          "assets" in result &&
-          !result.canceled &&
-          result.assets?.length
-        ) {
-          setImagenSeleccionada(result.assets[0]);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  // Lógica del Micrófono (del equipo)
-  const handleMicPress = () => {
-    if (isListening) {
-      setIsListening(false);
-      return;
-    }
-    setIsListening(true);
-    Alert.alert(
-      "Dictado por Voz",
-      "Escuchando tu consulta... Di lo que necesitas y lo transcribiremos en el campo de texto.",
-      [
-        {
-          text: "Cancelar",
-          style: "cancel",
-          onPress: () => setIsListening(false),
-        },
-        {
-          text: "Insertar ejemplo",
-          onPress: () => {
-            setPromptText("Necesito arreglar una filtración en el baño");
-            setIsListening(false);
-          },
-        },
-      ],
-    );
-  };
-
-  // Cámara (sin recorte: allowsEditing en Android aumenta los cierres de la app)
-  const seleccionarFoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permiso denegado", "Necesitamos acceso a la cámara.");
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      allowsEditing: false,
-      quality: 0.5,
-    });
-    if (!result.canceled) {
-      setImagenSeleccionada(result.assets[0]);
-    }
-  };
-
-  // Galería
-  const seleccionarDeGaleria = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: false,
-      quality: 0.5,
-    });
-    if (!result.canceled) {
-      setImagenSeleccionada(result.assets[0]);
-    }
-  };
-
-  const quitarFoto = () => setImagenSeleccionada(null);
-
-  // Envío al backend
-  const enviarConsulta = async () => {
-    if (isLoading) return; // evita envíos repetidos
-
-    const texto = promptText.trim();
-
-    if (!imagenSeleccionada && !texto) {
-      Alert.alert(
-        "Falta información",
-        "Por favor, adjunta una foto o describe el problema.",
-      );
-      return;
-    }
-
-    setIsLoading(true);
-    setOficios([]);
-
-    const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
-    const API_URL = `${API_BASE}/api/ia/diagnostico-visual`;
-
-    console.log("API_URL usada:", API_URL);
-
-    try {
-      const formData = new FormData();
-
-      if (imagenSeleccionada) {
-        if (Platform.OS === "web") {
-          // En web hay que convertir la foto a Blob
-          const blob = await (await fetch(imagenSeleccionada.uri)).blob();
-          formData.append("imagen", blob, "diagnostico.jpg");
-        } else {
-          formData.append("imagen", {
-            uri: imagenSeleccionada.uri,
-            name: "diagnostico.jpg",
-            type: imagenSeleccionada.mimeType ?? "image/jpeg",
-          } as any);
-        }
-      }
-
-      if (texto) {
-        formData.append("descripcion", texto);
-      }
-
-      const { status, data } = await enviarMultipart(API_URL, formData);
-
-      if (status < 200 || status >= 300) {
-        Alert.alert(
-          "Diagnóstico IA",
-          data?.error || "No pudimos procesar la solicitud.",
-        );
-      } else {
-        setOficios(data?.oficios_sugeridos ?? []);
-      }
-    } catch (error) {
-      console.error("Error de red:", error);
-      Alert.alert(
-        "Error de conexión",
-        "No pudimos conectar con el servidor. Verifica que el backend esté corriendo.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const {
+    promptText,
+    setPromptText,
+    isListening,
+    isLoading,
+    oficios,
+    imagenSeleccionada,
+    handleMicPress,
+    seleccionarFoto,
+    seleccionarDeGaleria,
+    quitarFoto,
+    enviarConsulta,
+  } = useDiagnosticoIA();
 
   return (
     <View
@@ -271,7 +112,6 @@ export function HeroIA() {
         ]}
       >
         <View style={styles.inputRow}>
-          {/* Miniatura de la foto seleccionada */}
           {imagenSeleccionada && (
             <View style={styles.thumbnailWrapper}>
               <Image
@@ -306,7 +146,7 @@ export function HeroIA() {
             value={promptText}
             onChangeText={setPromptText}
             editable={!isListening}
-            accessibilityLabel="Caja de texto para describir tu problema a la inteligencia artificial"
+            accessibilityLabel="Caja de texto para describir tu problema"
           />
         </View>
 
@@ -329,7 +169,6 @@ export function HeroIA() {
               accessible={true}
               accessibilityRole="button"
               accessibilityLabel="Dictado por voz"
-              accessibilityHint="Toca para dictar tu problema por voz"
             >
               <Ionicons
                 name="mic-outline"
@@ -338,7 +177,6 @@ export function HeroIA() {
               />
             </TouchableOpacity>
 
-            {/* Cámara */}
             <TouchableOpacity
               style={[
                 styles.iconButton,
@@ -366,7 +204,6 @@ export function HeroIA() {
               />
             </TouchableOpacity>
 
-            {/* Galería */}
             <TouchableOpacity
               style={[
                 styles.iconButton,
@@ -397,7 +234,6 @@ export function HeroIA() {
             disabled={isLoading}
             accessible={true}
             accessibilityRole="button"
-            accessibilityLabel="Preguntar a la IA"
           >
             <MaterialCommunityIcons
               name="magic-staff"
@@ -419,57 +255,8 @@ export function HeroIA() {
         </View>
       </View>
 
-      {isLoading && (
-        <View style={{ marginTop: 24, alignItems: "center" }}>
-          <ActivityIndicator size="large" color={colors.secondary} />
-          <Text
-            numberOfLines={1}
-            style={{ color: colors.textSecondary, marginTop: 8 }}
-          >
-            Analizando tu consulta...
-          </Text>
-        </View>
-      )}
-
-      {oficios.length > 0 && (
-        <View style={{ marginTop: 24, width: "100%", alignItems: "center" }}>
-          <Text
-            style={{ color: colors.text, marginBottom: 8, fontWeight: "bold" }}
-          >
-            Sugerencias de la IA:
-          </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              justifyContent: "center",
-              gap: 8,
-            }}
-          >
-            {oficios.map((oficio, index) => (
-              <TouchableOpacity
-                key={index}
-                style={{
-                  backgroundColor: colors.secondary,
-                  paddingVertical: 8,
-                  paddingHorizontal: 16,
-                  borderRadius: 20,
-                }}
-              >
-                <Text
-                  style={{
-                    color: isDarkMode ? "#121826" : "#FFF",
-                    fontWeight: "bold",
-                    fontSize: 14,
-                  }}
-                >
-                  {oficio}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
+      {/* Renderizado de Resultados Modularizado */}
+      <ResultadosIA oficios={oficios} isLoading={isLoading} />
     </View>
   );
 }
@@ -494,10 +281,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 28,
   },
-  badgeText: {
-    fontWeight: "700",
-    marginLeft: 8,
-  },
+  badgeText: { fontWeight: "700", marginLeft: 8 },
   mainTitle: {
     fontWeight: "800",
     textAlign: "center",
@@ -510,11 +294,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     paddingHorizontal: 8,
   },
-  searchContainer: {
-    width: "100%",
-    borderRadius: 24,
-    padding: 8,
-  },
+  searchContainer: { width: "100%", borderRadius: 24, padding: 8 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -522,19 +302,9 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
   },
-  textInput: {
-    flex: 1,
-    minHeight: 40,
-  },
-  thumbnailWrapper: {
-    position: "relative",
-    marginRight: 12,
-  },
-  thumbnail: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-  },
+  textInput: { flex: 1, minHeight: 40 },
+  thumbnailWrapper: { position: "relative", marginRight: 12 },
+  thumbnail: { width: 50, height: 50, borderRadius: 12 },
   removeButton: {
     position: "absolute",
     top: -6,
@@ -553,10 +323,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingBottom: 4,
   },
-  iconGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  iconGroup: { flexDirection: "row", alignItems: "center" },
   iconButton: {
     padding: 10,
     borderRadius: 20,
@@ -573,9 +340,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexShrink: 1,
   },
-  aiButtonText: {
-    fontWeight: "700",
-    marginLeft: 6,
-    flexShrink: 1,
-  },
+  aiButtonText: { fontWeight: "700", marginLeft: 6, flexShrink: 1 },
 });
