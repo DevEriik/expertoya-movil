@@ -1,53 +1,35 @@
-import React, { useState } from "react";
+import { useAccessibility } from "@/context/AccessibilityContext";
+import { useTheme } from "@/hooks/use-theme";
+import { useDiagnosticoIA } from "@/hooks/useDiagnosticoIA";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import {
-  Alert,
-  Platform,
+  Image,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { useTheme } from "@/hooks/use-theme";
-import { useAccessibility } from "@/context/AccessibilityContext";
+import { ResultadosIA } from "./ResultadosIA";
 
 export function HeroIA() {
   const colors = useTheme();
   const { isDarkMode, highContrast, voiceDictation, scaleFont } =
     useAccessibility();
 
-  const [promptText, setPromptText] = useState("");
-  const [isListening, setIsListening] = useState(false);
-
-  const handleMicPress = () => {
-    if (isListening) {
-      setIsListening(false);
-      return;
-    }
-
-    setIsListening(true);
-    Alert.alert(
-      "Dictado por Voz",
-      "Escuchando tu consulta... Di lo que necesitas y lo transcribiremos en el campo.",
-      [
-        {
-          text: "Cancelar",
-          style: "cancel",
-          onPress: () => setIsListening(false),
-        },
-        {
-          text: "Insertar ejemplo",
-          onPress: () => {
-            setPromptText(
-              "Tengo una fuga de agua en el baño y necesito un plomero urgente."
-            );
-            setIsListening(false);
-          },
-        },
-      ]
-    );
-  };
+  const {
+    promptText,
+    setPromptText,
+    isListening,
+    isLoading,
+    oficios,
+    imagenSeleccionada,
+    handleMicPress,
+    seleccionarFoto,
+    seleccionarDeGaleria,
+    quitarFoto,
+    enviarConsulta,
+  } = useDiagnosticoIA();
 
   return (
     <View
@@ -61,7 +43,6 @@ export function HeroIA() {
         },
       ]}
     >
-      {/* Etiqueta de IA */}
       <View
         style={[
           styles.badgeContainer,
@@ -91,7 +72,6 @@ export function HeroIA() {
         </Text>
       </View>
 
-      {/* Título Principal */}
       <Text
         style={[
           styles.mainTitle,
@@ -105,7 +85,6 @@ export function HeroIA() {
         ¿No estás seguro{"\n"}de a qué{"\n"}especialista{"\n"}llamar?
       </Text>
 
-      {/* Subtítulo */}
       <Text
         style={[
           styles.subtitle,
@@ -120,7 +99,6 @@ export function HeroIA() {
         instante con el experto exacto que necesitas.
       </Text>
 
-      {/* Caja de Búsqueda Interactiva */}
       <View
         style={[
           styles.searchContainer,
@@ -134,70 +112,94 @@ export function HeroIA() {
         ]}
       >
         <View style={styles.inputRow}>
+          {imagenSeleccionada && (
+            <View style={styles.thumbnailWrapper}>
+              <Image
+                source={{ uri: imagenSeleccionada.uri }}
+                style={styles.thumbnail}
+              />
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={quitarFoto}
+                accessibilityRole="button"
+                accessibilityLabel="Quitar foto adjunta"
+              >
+                <Ionicons name="close" size={14} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          )}
+
           <TextInput
             style={[
               styles.textInput,
-              { color: colors.text, fontSize: scaleFont(15) },
+              { color: colors.text, fontSize: scaleFont(16) },
             ]}
             placeholder={
               isListening
-                ? "Escuchando tu voz..."
+                ? "Escuchando... Di tu consulta"
                 : "Ej., Tengo una pérdida de agua..."
             }
             placeholderTextColor={
-              isListening ? colors.primary : colors.textSecondary
+              isListening ? colors.secondary : colors.textSecondary
             }
+            multiline={true}
             value={promptText}
             onChangeText={setPromptText}
-            multiline={true}
+            editable={!isListening}
+            accessibilityLabel="Caja de texto para describir tu problema"
           />
         </View>
 
         <View style={styles.toolsRow}>
           <View style={styles.iconGroup}>
             <TouchableOpacity
+              style={[
+                styles.iconButton,
+                {
+                  backgroundColor: colors.backgroundElement,
+                  borderColor: isListening ? colors.secondary : "transparent",
+                  borderWidth: isListening ? 1 : 0,
+                },
+                voiceDictation && {
+                  padding: 14,
+                  backgroundColor: colors.backgroundSelected,
+                },
+              ]}
               onPress={handleMicPress}
               accessible={true}
               accessibilityRole="button"
               accessibilityLabel="Dictado por voz"
-              accessibilityHint="Presiona para dictar tu consulta con la voz"
-              style={[
-                styles.iconButton,
-                voiceDictation
-                  ? {
-                      backgroundColor: isListening
-                        ? colors.danger
-                        : isDarkMode
-                        ? "#3A2200"
-                        : "#FEF3E0",
-                      borderColor: colors.primary,
-                      borderWidth: highContrast ? 2.5 : 2,
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderRadius: 22,
-                    }
-                  : {
-                      backgroundColor: colors.backgroundElement,
-                      borderColor: colors.backgroundSelected,
-                      borderWidth: 1,
-                    },
-              ]}
             >
               <Ionicons
-                name={
-                  voiceDictation
-                    ? isListening
-                      ? "mic"
-                      : "mic"
-                    : "mic-outline"
-                }
-                size={voiceDictation ? 24 : 22}
+                name="mic-outline"
+                size={voiceDictation ? 28 : 22}
+                color={isListening ? colors.secondary : colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.iconButton,
+                { backgroundColor: colors.backgroundElement },
+                imagenSeleccionada && {
+                  borderColor: colors.secondary,
+                  borderWidth: 1,
+                },
+              ]}
+              onPress={imagenSeleccionada ? quitarFoto : seleccionarFoto}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={
+                imagenSeleccionada
+                  ? "Quitar foto adjunta"
+                  : "Sacar foto del problema"
+              }
+            >
+              <Ionicons
+                name={imagenSeleccionada ? "close-outline" : "camera-outline"}
+                size={22}
                 color={
-                  voiceDictation
-                    ? isListening
-                      ? "#FFFFFF"
-                      : colors.primary
-                    : colors.textSecondary
+                  imagenSeleccionada ? colors.secondary : colors.textSecondary
                 }
               />
             </TouchableOpacity>
@@ -205,18 +207,15 @@ export function HeroIA() {
             <TouchableOpacity
               style={[
                 styles.iconButton,
-                {
-                  backgroundColor: colors.backgroundElement,
-                  borderColor: colors.backgroundSelected,
-                  borderWidth: 1,
-                },
+                { backgroundColor: colors.backgroundElement },
               ]}
+              onPress={seleccionarDeGaleria}
               accessible={true}
               accessibilityRole="button"
-              accessibilityLabel="Subir foto o video"
+              accessibilityLabel="Elegir foto de la galería"
             >
               <Ionicons
-                name="camera-outline"
+                name="image-outline"
                 size={22}
                 color={colors.textSecondary}
               />
@@ -228,11 +227,13 @@ export function HeroIA() {
               styles.aiButton,
               {
                 backgroundColor: colors.secondary,
+                opacity: isLoading ? 0.6 : 1,
               },
             ]}
+            onPress={enviarConsulta}
+            disabled={isLoading}
             accessible={true}
             accessibilityRole="button"
-            accessibilityLabel="Preguntar a la IA"
           >
             <MaterialCommunityIcons
               name="magic-staff"
@@ -253,6 +254,9 @@ export function HeroIA() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Renderizado de Resultados Modularizado */}
+      <ResultadosIA oficios={oficios} isLoading={isLoading} />
     </View>
   );
 }
@@ -263,17 +267,11 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     padding: 24,
     alignItems: "center",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowRadius: 16,
-      },
-      android: { elevation: 6 },
-      web: {
-        boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-      },
-    }),
+    marginBottom: 28,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    elevation: 6,
   },
   badgeContainer: {
     flexDirection: "row",
@@ -283,14 +281,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 28,
   },
-  badgeText: {
-    fontWeight: "700",
-    marginLeft: 8,
-  },
+  badgeText: { fontWeight: "700", marginLeft: 8 },
   mainTitle: {
     fontWeight: "800",
     textAlign: "center",
-    marginBottom: 16,
+    marginBottom: 20,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontWeight: "400",
@@ -298,18 +294,27 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     paddingHorizontal: 8,
   },
-  searchContainer: {
-    width: "100%",
-    borderRadius: 24,
-    padding: 8,
-  },
+  searchContainer: { width: "100%", borderRadius: 24, padding: 8 },
   inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 16,
   },
-  textInput: {
-    minHeight: 40,
+  textInput: { flex: 1, minHeight: 40 },
+  thumbnailWrapper: { position: "relative", marginRight: 12 },
+  thumbnail: { width: 50, height: 50, borderRadius: 12 },
+  removeButton: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    backgroundColor: "#EF4444",
+    borderRadius: 12,
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   toolsRow: {
     flexDirection: "row",
@@ -318,10 +323,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingBottom: 4,
   },
-  iconGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  iconGroup: { flexDirection: "row", alignItems: "center" },
   iconButton: {
     padding: 10,
     borderRadius: 20,
@@ -333,12 +335,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     borderRadius: 16,
     paddingVertical: 12,
-    paddingHorizontal: 18,
+    paddingHorizontal: 12,
     justifyContent: "center",
     alignItems: "center",
+    flexShrink: 1,
   },
-  aiButtonText: {
-    fontWeight: "700",
-    marginLeft: 8,
-  },
+  aiButtonText: { fontWeight: "700", marginLeft: 6, flexShrink: 1 },
 });

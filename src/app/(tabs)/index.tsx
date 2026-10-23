@@ -1,11 +1,11 @@
 import React, { useState, useCallback } from "react";
 import {
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
+  TouchableOpacity,
+  ScrollView,
   RefreshControl
 } from "react-native";
 import { Link } from "expo-router";
@@ -31,11 +31,11 @@ export default function InicioScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
       }
     >
-      <Logo
+      {/*<Logo
         width={180}
         height={40}
         style={{ alignSelf: "flex-start", marginBottom: 16, marginLeft: 4 }}
-      />
+      />*/}
       <HeroIA />
       <PagosSeguros />
       <View style={styles.buttonContainer}>

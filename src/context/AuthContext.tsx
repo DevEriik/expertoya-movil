@@ -47,10 +47,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const loadStorageData = async () => {
     try {
       const storedToken = await getToken("auth_token");
+
       // Fallback para usuarios que ya tenían la app instalada con el modelo viejo
       const storedUsuario =
         (await getToken("usuario_data")) || (await getToken("user_data"));
-
+      console.log("Sesión restaurada:", !!storedToken, !!storedUsuario);
       if (storedToken && storedUsuario) {
         setToken(storedToken);
         const parsed = JSON.parse(storedUsuario);
