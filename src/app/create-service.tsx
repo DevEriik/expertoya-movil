@@ -29,6 +29,7 @@ import {
   MAX_ACTIVE_SERVICES,
   saveService,
 } from "@/utils/servicesStorage";
+import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 
 const FONT_FAMILY = Platform.select({
   web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
@@ -80,6 +81,7 @@ export default function CreateServiceModal() {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(() => {
     if (Platform.OS === "web" && typeof navigator !== "undefined") {
       return navigator.onLine;
@@ -91,6 +93,7 @@ export default function CreateServiceModal() {
   const [aiElapsedSeconds, setAiElapsedSeconds] = useState(0);
   const [aiGeneratedSuccess, setAiGeneratedSuccess] = useState(false);
   const aiTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const aiAbortControllerRef = useRef<AbortController | null>(null);
 
   const approvedIds = useMemo(() => {
     return new Set(approvedOficios.map((o) => o.id));
@@ -124,6 +127,9 @@ export default function CreateServiceModal() {
     return () => {
       if (aiTimerRef.current) {
         clearInterval(aiTimerRef.current);
+      }
+      if (aiAbortControllerRef.current) {
+        aiAbortControllerRef.current.abort();
       }
     };
   }, []);
@@ -307,7 +313,7 @@ export default function CreateServiceModal() {
     return PALABRAS_OFENSIVAS.some((palabra) => limpio.includes(palabra));
   };
 
-  const handleGenerateAIDescription = () => {
+  const handleGenerateAIDescription = async () => {
     if (!isOnline) {
       Alert.alert(
         "Sin conexión a internet",
@@ -339,29 +345,86 @@ export default function CreateServiceModal() {
     setAiElapsedSeconds(0);
     setAiGeneratedSuccess(false);
 
-    let elapsed = 0;
-    const targetSimulatedTime = 3;
-
     if (aiTimerRef.current) clearInterval(aiTimerRef.current);
+    if (aiAbortControllerRef.current) aiAbortControllerRef.current.abort();
 
+    const controller = new AbortController();
+    aiAbortControllerRef.current = controller;
+
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 10000);
+
+    let elapsed = 0;
     aiTimerRef.current = setInterval(() => {
       elapsed += 1;
       setAiElapsedSeconds(elapsed);
-
-      if (elapsed >= targetSimulatedTime) {
-        if (aiTimerRef.current) clearInterval(aiTimerRef.current);
-
-        const cleanTitle = title.trim();
-        const generated = `Servicio profesional de ${cleanTitle}. Trabajo integral realizado con materiales de primera calidad, diagnóstico técnico exhaustivo y cumplimiento estricto de normas de seguridad. Se garantiza prolijidad, puntualidad y asesoramiento personalizado para asegurar un resultado óptimo y duradero.`;
-
-        setDescription(generated);
-        setAiGenerating(false);
-        setAiGeneratedSuccess(true);
-      }
     }, 1000);
+
+    const selectedOficioObj = oficios.find((o) => o.id === selectedOficioId);
+    const nombreOficio = selectedOficioObj?.nombre_oficio || "Oficios generales";
+
+    try {
+      const res = await apiClient("/api/ia/generate-description", {
+        method: "POST",
+        body: JSON.stringify({
+          titulo: title.trim(),
+          precio: price.trim(),
+          categoria: nombreOficio,
+          descripcion_actual: description.trim(),
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      if (aiTimerRef.current) clearInterval(aiTimerRef.current);
+
+      if (!res.ok) {
+        let errJson: any = {};
+        try {
+          errJson = await res.json();
+        } catch {
+        }
+        throw new Error(
+          errJson.error || "No se pudo generar la descripción comercial con IA."
+        );
+      }
+
+      const data = await res.json();
+      if (!data.descripcion || typeof data.descripcion !== "string") {
+        throw new Error("La IA no devolvió una descripción válida.");
+      }
+
+      setDescription(data.descripcion.trim());
+      setAiGeneratedSuccess(true);
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (aiTimerRef.current) clearInterval(aiTimerRef.current);
+
+      if (err.name === "AbortError") {
+        Alert.alert(
+          "Tiempo de espera agotado",
+          "La solicitud a la IA superó el límite máximo de 10 segundos. Por favor verifica tu conexión o intenta nuevamente.",
+          [{ text: "Entendido", style: "default" }]
+        );
+      } else {
+        Alert.alert(
+          "Error en Asistente IA",
+          err.message || "Ocurrió un error al contactar al asistente de IA.",
+          [{ text: "Entendido", style: "default" }]
+        );
+      }
+    } finally {
+      setAiGenerating(false);
+      setAiElapsedSeconds(0);
+      aiAbortControllerRef.current = null;
+    }
   };
 
   const handleCancelAIGeneration = () => {
+    if (aiAbortControllerRef.current) {
+      aiAbortControllerRef.current.abort();
+    }
     if (aiTimerRef.current) {
       clearInterval(aiTimerRef.current);
     }
@@ -371,29 +434,25 @@ export default function CreateServiceModal() {
 
   const handleDeleteService = () => {
     if (!params.serviceId) return;
+    setShowDeleteModal(true);
+  };
 
-    Alert.alert(
-      "Eliminar Servicio",
-      `¿Estás seguro de que deseas eliminar permanentemente "${title || "este servicio"}"? Esta acción no se puede deshacer.`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar Servicio",
-          style: "destructive",
-          onPress: async () => {
-            setIsDeleting(true);
-            try {
-              await deleteService(params.serviceId!);
-              handleClose();
-            } catch (err: any) {
-              Alert.alert("Error", err.message || "No se pudo eliminar el servicio.");
-            } finally {
-              setIsDeleting(false);
-            }
-          },
-        },
-      ],
-    );
+  const handleConfirmDelete = async () => {
+    if (!params.serviceId) return;
+    setIsDeleting(true);
+    try {
+      await deleteService(params.serviceId!);
+      setShowDeleteModal(false);
+      handleClose();
+    } catch (err: any) {
+      if (Platform.OS === "web") {
+        window.alert(err.message || "No se pudo eliminar el servicio.");
+      } else {
+        Alert.alert("Error", err.message || "No se pudo eliminar el servicio.");
+      }
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -1157,20 +1216,7 @@ export default function CreateServiceModal() {
                   )}
                 </TouchableOpacity>
 
-                {aiGenerating && (
-                  <View style={styles.aiCancelRow}>
-                    <TouchableOpacity
-                      onPress={handleCancelAIGeneration}
-                      style={styles.aiCancelBtn}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="close-circle-outline" size={14} color="#EF4444" />
-                      <Text style={styles.aiCancelBtnText}>
-                        Cancelar espera
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+
 
                 {aiGeneratedSuccess && (
                   <View
@@ -1659,6 +1705,13 @@ export default function CreateServiceModal() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <ConfirmDeleteModal
+        visible={showDeleteModal}
+        serviceTitle={title}
+        isDeleting={isDeleting}
+        onCancel={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+      />
     </BlurView>
   );
 }

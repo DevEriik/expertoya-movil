@@ -1,5 +1,6 @@
 import ServiceCard from "@/components/ServiceCard";
 import ServiceDetailModal from "@/components/ServiceDetailModal";
+import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { ServicioPublicadoItem } from "@/types/service";
@@ -39,6 +40,9 @@ export default function AccountDetailsScreen() {
   const [services, setServices] = useState<ServicioPublicadoItem[]>([]);
   const [selectedServiceForDetail, setSelectedServiceForDetail] =
     useState<ServicioPublicadoItem | null>(null);
+  const [serviceToDelete, setServiceToDelete] =
+    useState<ServicioPublicadoItem | null>(null);
+  const [isDeletingService, setIsDeletingService] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
 
   const [profile, setProfile] = useState({
@@ -594,24 +598,7 @@ export default function AccountDetailsScreen() {
                   }
                 }}
                 onDelete={(srv) => {
-                  Alert.alert(
-                    "Eliminar Servicio",
-                    `¿Estás seguro de que deseas eliminar "${srv.titulo_servicio}"? Esta acción no se puede deshacer.`,
-                    [
-                      { text: "Cancelar", style: "cancel" },
-                      {
-                        text: "Eliminar",
-                        style: "destructive",
-                        onPress: async () => {
-                          try {
-                            await deleteService(srv.id);
-                          } catch (err: any) {
-                            Alert.alert("Error", "No se pudo eliminar el servicio.");
-                          }
-                        },
-                      },
-                    ],
-                  );
+                  setServiceToDelete(srv);
                 }}
               />
             </View>
@@ -632,25 +619,31 @@ export default function AccountDetailsScreen() {
           });
         }}
         onDeleteService={(srv) => {
-          Alert.alert(
-            "Eliminar Servicio",
-            `¿Estás seguro de que deseas eliminar "${srv.titulo_servicio}"? Esta acción no se puede deshacer.`,
-            [
-              { text: "Cancelar", style: "cancel" },
-              {
-                text: "Eliminar",
-                style: "destructive",
-                onPress: async () => {
-                  try {
-                    await deleteService(srv.id);
-                    setSelectedServiceForDetail(null);
-                  } catch (err: any) {
-                    Alert.alert("Error", "No se pudo eliminar el servicio.");
-                  }
-                },
-              },
-            ],
-          );
+          setServiceToDelete(srv);
+        }}
+      />
+
+      <ConfirmDeleteModal
+        visible={Boolean(serviceToDelete)}
+        serviceTitle={serviceToDelete?.titulo_servicio}
+        isDeleting={isDeletingService}
+        onCancel={() => setServiceToDelete(null)}
+        onConfirm={async () => {
+          if (!serviceToDelete) return;
+          setIsDeletingService(true);
+          try {
+            await deleteService(serviceToDelete.id);
+            setServiceToDelete(null);
+            setSelectedServiceForDetail(null);
+          } catch (err: any) {
+            if (Platform.OS === "web") {
+              window.alert(err.message || "No se pudo eliminar el servicio.");
+            } else {
+              Alert.alert("Error", err.message || "No se pudo eliminar el servicio.");
+            }
+          } finally {
+            setIsDeletingService(false);
+          }
         }}
       />
     </View>

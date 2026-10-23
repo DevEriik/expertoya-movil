@@ -1,9 +1,24 @@
 import Constants from 'expo-constants';
 import { getToken } from './secureStore';
-import { DeviceEventEmitter } from 'react-native';
+import { DeviceEventEmitter, Platform } from 'react-native';
 
-const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
+const getBaseApiUrl = (): string => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return 'http://localhost:3000';
+        }
+        return `http://${window.location.hostname}:3000`;
+    }
+
+    if (process.env.EXPO_PUBLIC_API_URL) {
+        return process.env.EXPO_PUBLIC_API_URL;
+    }
+
+    const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
+    return hostIp ? `http://${hostIp}:3000` : "http://localhost:3000";
+};
+
+export const API_URL = getBaseApiUrl();
 
 interface ApiOptions extends RequestInit {
     useToken?: boolean;
@@ -11,7 +26,7 @@ interface ApiOptions extends RequestInit {
 
 export const apiClient = async (endpoint: string, options: ApiOptions = {}) => {
     const { useToken = true, headers, ...restOptions } = options;
-    
+
     let defaultHeaders: HeadersInit = {
         'Content-Type': 'application/json',
     };
@@ -25,7 +40,6 @@ export const apiClient = async (endpoint: string, options: ApiOptions = {}) => {
 
     const isFormData = options.body instanceof FormData;
     if (isFormData) {
-        // Let the fetch automatically set the Content-Type with the correct boundary
         delete (defaultHeaders as Record<string, string>)['Content-Type'];
     }
 
@@ -39,7 +53,6 @@ export const apiClient = async (endpoint: string, options: ApiOptions = {}) => {
 
     const response = await fetch(`${API_URL}${endpoint}`, config);
 
-    // Interceptar 401 Unauthorized y 403 Forbidden para forzar el logout
     if (response.status === 401 || response.status === 403) {
         DeviceEventEmitter.emit('onUnauthorized');
     }
