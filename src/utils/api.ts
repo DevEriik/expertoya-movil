@@ -1,9 +1,24 @@
 import Constants from 'expo-constants';
+import { Platform, DeviceEventEmitter } from 'react-native';
 import { getToken } from './secureStore';
-import { DeviceEventEmitter } from 'react-native';
 
-const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || (hostIp ? `http://${hostIp}:3000` : "http://localhost:3000");
+const getBaseUrl = () => {
+    if (Platform.OS === 'web') {
+        const hostname =
+            typeof window !== 'undefined' && window.location?.hostname
+                ? window.location.hostname
+                : 'localhost';
+        return `http://${hostname}:3000`;
+    }
+    if (process.env.EXPO_PUBLIC_API_URL) {
+        return process.env.EXPO_PUBLIC_API_URL;
+    }
+    const hostIp = Constants.expoConfig?.hostUri?.split(':')[0];
+    return hostIp ? `http://${hostIp}:3000` : 'http://localhost:3000';
+};
+
+export const API_URL = getBaseUrl();
+
 
 interface ApiOptions extends RequestInit {
     useToken?: boolean;
@@ -11,7 +26,7 @@ interface ApiOptions extends RequestInit {
 
 export const apiClient = async (endpoint: string, options: ApiOptions = {}) => {
     const { useToken = true, headers, ...restOptions } = options;
-    
+
     let defaultHeaders: HeadersInit = {
         'Content-Type': 'application/json',
     };
@@ -25,7 +40,6 @@ export const apiClient = async (endpoint: string, options: ApiOptions = {}) => {
 
     const isFormData = options.body instanceof FormData;
     if (isFormData) {
-        // Let the fetch automatically set the Content-Type with the correct boundary
         delete (defaultHeaders as Record<string, string>)['Content-Type'];
     }
 
@@ -39,7 +53,6 @@ export const apiClient = async (endpoint: string, options: ApiOptions = {}) => {
 
     const response = await fetch(`${API_URL}${endpoint}`, config);
 
-    // Interceptar 401 Unauthorized y 403 Forbidden para forzar el logout
     if (response.status === 401 || response.status === 403) {
         DeviceEventEmitter.emit('onUnauthorized');
     }

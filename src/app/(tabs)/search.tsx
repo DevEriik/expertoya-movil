@@ -1,4 +1,5 @@
 import ProfilePreviewModal from "@/components/ProfilePreviewModal";
+import { ContactModal } from "@/components/chat/ContactModal";
 import { useTheme } from "@/hooks/use-theme";
 import { useLocation } from "@/hooks/useLocation";
 import { ServicioPublicadoItem } from "@/types/service";
@@ -6,6 +7,8 @@ import { apiClient } from "@/utils/api";
 import { COVERAGE_MESSAGE, isInCoverageZone } from "@/utils/geoZone";
 import { getPublicServicesByProfessionalId } from "@/utils/servicesStorage";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useAuth } from "@/context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -46,7 +49,9 @@ const RADIOS_KM = [5, 10, 20] as const;
 const RADIO_POR_DEFECTO = 10;
 
 export default function BusquedaScreen() {
+  const router = useRouter();
   const colors = useTheme();
+  const { usuario } = useAuth();
   const {
     coords,
     permission,
@@ -70,12 +75,13 @@ export default function BusquedaScreen() {
   const [sortByPriceAsc, setSortByPriceAsc] = useState(false);
   const [radioKm, setRadioKm] = useState<number>(RADIO_POR_DEFECTO);
 
-  // Estado para visualización del perfil del profesional por parte del cliente
   const [selectedPro, setSelectedPro] = useState<Profesional | null>(null);
   const [selectedProServices, setSelectedProServices] = useState<
     ServicioPublicadoItem[]
   >([]);
   const [showProModal, setShowProModal] = useState(false);
+
+  const [contactPro, setContactPro] = useState<Profesional | null>(null);
 
   const handleSelectProfesional = async (pro: Profesional) => {
     setSelectedPro(pro);
@@ -206,14 +212,14 @@ export default function BusquedaScreen() {
           source={{
             uri:
               item.usuario.fotoPerfil &&
-              !(
-                Platform.OS === "web" &&
-                item.usuario.fotoPerfil.startsWith("file://")
-              )
+                !(
+                  Platform.OS === "web" &&
+                  item.usuario.fotoPerfil.startsWith("file://")
+                )
                 ? item.usuario.fotoPerfil
                 : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                    `${item.usuario.nombre} ${item.usuario.apellido}`,
-                  )}`,
+                  `${item.usuario.nombre} ${item.usuario.apellido}`,
+                )}`,
           }}
           style={styles.avatar}
         />
@@ -243,11 +249,49 @@ export default function BusquedaScreen() {
           </View>
         </View>
       </View>
-      {item.tarifaBase !== undefined && (
-        <Text style={[styles.tarifa, { color: colors.text }]}>
-          ${item.tarifaBase}/hora
-        </Text>
-      )}
+
+      <View style={styles.cardFooterRow}>
+        {item.tarifaBase !== undefined ? (
+          <Text style={[styles.tarifa, { color: colors.text }]}>
+            ${item.tarifaBase}/hora
+          </Text>
+        ) : (
+          <Text style={[styles.tarifaConsultar, { color: colors.textSecondary }]}>
+            Tarifa a convenir
+          </Text>
+        )}
+
+        {item.usuario._id === usuario?.id || item._id === usuario?.id ? (
+          <View style={styles.cardSelfBadge}>
+            <Ionicons
+              name="person-circle-outline"
+              size={15}
+              color={colors.textSecondary}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={[styles.cardSelfBadgeText, { color: colors.textSecondary }]}>
+              Tu perfil
+            </Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.cardContactBtn}
+            onPress={(e: any) => {
+              e.stopPropagation?.();
+              setContactPro(item);
+            }}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="chatbubble-ellipses"
+              size={14}
+              color="#FFFFFF"
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.cardContactBtnText}>Contactar</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </TouchableOpacity>
   );
 
@@ -777,6 +821,14 @@ export default function BusquedaScreen() {
         <ProfilePreviewModal
           visible={showProModal}
           onClose={() => setShowProModal(false)}
+          onContact={
+            selectedPro.usuario._id === usuario?.id || selectedPro._id === usuario?.id
+              ? undefined
+              : () => {
+                setShowProModal(false);
+                setContactPro(selectedPro);
+              }
+          }
           nombre={selectedPro.usuario.nombre}
           apellido={selectedPro.usuario.apellido}
           fotoPerfil={selectedPro.usuario.fotoPerfil}
@@ -784,6 +836,24 @@ export default function BusquedaScreen() {
           oficiosNombres={selectedPro.profesiones.map((p) => p.nombre)}
           calificacion={selectedPro.usuario.calificacionPromedio}
           servicios={selectedProServices}
+        />
+      )}
+
+      {contactPro && (
+        <ContactModal
+          visible={Boolean(contactPro)}
+          professionalId={contactPro._id}
+          professionalName={`${contactPro.usuario.nombre} ${contactPro.usuario.apellido}`.trim()}
+          professionalPhoto={contactPro.usuario.fotoPerfil}
+          profession={contactPro.profesiones.map((p) => p.nombre).join(", ")}
+          onClose={() => setContactPro(null)}
+          onSuccess={(solicitudId) => {
+            setContactPro(null);
+            router.push({
+              pathname: "/(tabs)/chat",
+              params: { chatId: solicitudId },
+            });
+          }}
         />
       )}
     </View>
@@ -861,6 +931,46 @@ const styles = StyleSheet.create({
   rating: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: { fontSize: 12 },
   tarifa: { fontSize: 14, fontWeight: "600" },
+  tarifaConsultar: { fontSize: 13, fontStyle: "italic" },
+  cardFooterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(148, 163, 184, 0.2)",
+  },
+  cardContactBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FF8C00",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+    shadowColor: "#FF8C00",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  cardContactBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  cardSelfBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(148, 163, 184, 0.15)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  cardSelfBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
   emptyContainer: {
     alignItems: "center",
     paddingVertical: 60,
