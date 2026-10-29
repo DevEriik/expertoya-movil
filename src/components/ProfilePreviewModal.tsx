@@ -17,6 +17,7 @@ import { useAccessibility } from "@/context/AccessibilityContext";
 import ServiceDetailModal from "@/components/ServiceDetailModal";
 import { ServicioPublicadoItem } from "@/types/service";
 import { getServices } from "@/utils/servicesStorage";
+import SolicitudModal from "@/components/inicio/SolicitudModal";
 
 interface ProfilePreviewModalProps {
   visible: boolean;
@@ -32,6 +33,7 @@ interface ProfilePreviewModalProps {
   totalReviews?: number;
   servicios?: ServicioPublicadoItem[];
   aniosExperiencia?: string;
+  profesionalId: string;
 }
 
 export default function ProfilePreviewModal({
@@ -48,6 +50,7 @@ export default function ProfilePreviewModal({
   totalReviews = 310,
   servicios,
   aniosExperiencia,
+  profesionalId,
 }: ProfilePreviewModalProps) {
   const insets = useSafeAreaInsets();
   const colors = useTheme();
@@ -58,6 +61,8 @@ export default function ProfilePreviewModal({
   );
   const [selectedDetailService, setSelectedDetailService] =
     useState<ServicioPublicadoItem | null>(null);
+
+  const [solicitudVisible, setSolicitudVisible] = useState(false);
 
   useEffect(() => {
     if (servicios && servicios.length > 0) {
@@ -73,9 +78,7 @@ export default function ProfilePreviewModal({
     `${nombre.trim()} ${apellido.trim()}`.trim() || "Tu Nombre";
 
   const oficioPrincipal =
-    oficiosNombres.length > 0
-      ? oficiosNombres[0]
-      : "Profesional Certificado";
+    oficiosNombres.length > 0 ? oficiosNombres[0] : "Profesional Certificado";
 
   const [imgError, setImgError] = useState(false);
 
@@ -124,10 +127,7 @@ export default function ProfilePreviewModal({
             <View style={styles.bannerOverlay} />
 
             <TouchableOpacity
-              style={[
-                styles.backButton,
-                { top: Math.max(insets.top + 8, 20) },
-              ]}
+              style={[styles.backButton, { top: Math.max(insets.top + 8, 20) }]}
               onPress={onClose}
               activeOpacity={0.8}
             >
@@ -225,7 +225,9 @@ export default function ProfilePreviewModal({
                     { color: isDark ? "#E2E8F0" : "#283593" },
                   ]}
                 >
-                  {aniosExperiencia} {Number(aniosExperiencia) === 1 ? "año" : "años"} de experiencia
+                  {aniosExperiencia}{" "}
+                  {Number(aniosExperiencia) === 1 ? "año" : "años"} de
+                  experiencia
                 </Text>
               </View>
             ) : null}
@@ -300,7 +302,9 @@ export default function ProfilePreviewModal({
               <View style={styles.experienceBadge}>
                 <Ionicons name="ribbon-outline" size={16} color="#FF8C00" />
                 <Text style={styles.experienceBadgeText}>
-                  {aniosExperiencia} {Number(aniosExperiencia) === 1 ? "año" : "años"} de trayectoria profesional
+                  {aniosExperiencia}{" "}
+                  {Number(aniosExperiencia) === 1 ? "año" : "años"} de
+                  trayectoria profesional
                 </Text>
               </View>
             ) : null}
@@ -482,7 +486,8 @@ export default function ProfilePreviewModal({
                   { color: isDark ? "#94A3B8" : "#60646C" },
                 ]}
               >
-                Super profesional. Diagnosticó y resolvió el problema en tiempo récord. Muy recomendado.
+                Super profesional. Diagnosticó y resolvió el problema en tiempo
+                récord. Muy recomendado.
               </Text>
               <Text
                 style={[
@@ -506,40 +511,67 @@ export default function ProfilePreviewModal({
             },
           ]}
         >
-          <TouchableOpacity
-            style={[
-              styles.secondaryButton,
-              { borderColor: isDark ? "#4B5563" : "#CBD5E1" },
-            ]}
-            onPress={onClose}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="create-outline"
-              size={18}
-              color={isDark ? "#FDFCF4" : "#283593"}
-            />
-            <Text
-              style={[
-                styles.secondaryButtonText,
-                { color: isDark ? "#FDFCF4" : "#283593" },
-              ]}
-            >
-              Seguir Editando
-            </Text>
-          </TouchableOpacity>
+          {onConfirmSave ? (
+            /* --- VISTA DEL PROFESIONAL (Editando su perfil) --- */
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.secondaryButton,
+                  { borderColor: isDark ? "#4B5563" : "#CBD5E1" },
+                ]}
+                onPress={onClose}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={18}
+                  color={isDark ? "#FDFCF4" : "#283593"}
+                />
+                <Text
+                  style={[
+                    styles.secondaryButtonText,
+                    { color: isDark ? "#FDFCF4" : "#283593" },
+                  ]}
+                >
+                  Seguir Editando
+                </Text>
+              </TouchableOpacity>
 
-          {onConfirmSave && (
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => {
+                  onClose();
+                  onConfirmSave();
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                <Text style={styles.primaryButtonText}>Guardar y Publicar</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            /* --- VISTA DEL CLIENTE (Quiere contratar) --- */
             <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={() => {
-                onClose();
-                onConfirmSave();
-              }}
+              style={[
+                styles.primaryButton,
+                { backgroundColor: isDark ? "#FFB74D" : "#FF8C00" },
+              ]}
+              onPress={() => setSolicitudVisible(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-              <Text style={styles.primaryButtonText}>Guardar y Publicar</Text>
+              <Ionicons
+                name="calendar-outline"
+                size={18}
+                color={isDark ? "#121826" : "#FFFFFF"}
+              />
+              <Text
+                style={[
+                  styles.primaryButtonText,
+                  { color: isDark ? "#121826" : "#FFFFFF" },
+                ]}
+              >
+                Solicitar servicio
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -556,6 +588,11 @@ export default function ProfilePreviewModal({
               `Has solicitado el servicio "${srv.titulo_servicio}". El profesional recibirá la notificación con tus datos para coordinar el trabajo.`,
             );
           }}
+        />
+        <SolicitudModal
+          visible={solicitudVisible}
+          onClose={() => setSolicitudVisible(false)}
+          profesionalId={profesionalId} // <-- Actualiza esta línea
         />
       </View>
     </Modal>
