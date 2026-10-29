@@ -1,4 +1,11 @@
-import React, { useEffect, useState } from "react";
+import SolicitudModal from "@/components/inicio/SolicitudModal";
+import ServiceDetailModal from "@/components/ServiceDetailModal";
+import { useAccessibility } from "@/context/AccessibilityContext";
+import { useTheme } from "@/hooks/use-theme";
+import { ServicioPublicadoItem } from "@/types/service";
+import { getServices } from "@/utils/servicesStorage";
+import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -11,13 +18,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "@/hooks/use-theme";
-import { useAccessibility } from "@/context/AccessibilityContext";
-import ServiceDetailModal from "@/components/ServiceDetailModal";
-import { ServicioPublicadoItem } from "@/types/service";
-import { getServices } from "@/utils/servicesStorage";
-import SolicitudModal from "@/components/inicio/SolicitudModal";
 
 interface ProfilePreviewModalProps {
   visible: boolean;
@@ -542,7 +542,12 @@ export default function ProfilePreviewModal({
               onPress={onContact}
               activeOpacity={0.8}
             >
-              <Ionicons name="chatbubble-ellipses" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Ionicons
+                name="chatbubble-ellipses"
+                size={18}
+                color="#FFFFFF"
+                style={{ marginRight: 6 }}
+              />
               <Text style={styles.primaryButtonText}>Contactar</Text>
             </TouchableOpacity>
           )}
