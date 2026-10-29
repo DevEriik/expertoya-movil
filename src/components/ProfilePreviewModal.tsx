@@ -23,6 +23,7 @@ interface ProfilePreviewModalProps {
   visible: boolean;
   onClose: () => void;
   onConfirmSave?: () => void;
+  onContact?: () => void;
   nombre: string;
   apellido: string;
   fotoPerfil?: string;
@@ -40,6 +41,7 @@ export default function ProfilePreviewModal({
   visible,
   onClose,
   onConfirmSave,
+  onContact,
   nombre,
   apellido,
   fotoPerfil,
@@ -511,46 +513,41 @@ export default function ProfilePreviewModal({
             },
           ]}
         >
-          {onConfirmSave ? (
-            /* --- VISTA DEL PROFESIONAL (Editando su perfil) --- */
-            <>
-              <TouchableOpacity
-                style={[
-                  styles.secondaryButton,
-                  { borderColor: isDark ? "#4B5563" : "#CBD5E1" },
-                ]}
-                onPress={onClose}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="create-outline"
-                  size={18}
-                  color={isDark ? "#FDFCF4" : "#283593"}
-                />
-                <Text
-                  style={[
-                    styles.secondaryButtonText,
-                    { color: isDark ? "#FDFCF4" : "#283593" },
-                  ]}
-                >
-                  Seguir Editando
-                </Text>
-              </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.secondaryButton,
+              { borderColor: isDark ? "#4B5563" : "#CBD5E1" },
+            ]}
+            onPress={onClose}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={onContact ? "arrow-back" : "create-outline"}
+              size={18}
+              color={isDark ? "#FDFCF4" : "#283593"}
+            />
+            <Text
+              style={[
+                styles.secondaryButtonText,
+                { color: isDark ? "#FDFCF4" : "#283593" },
+              ]}
+            >
+              {onContact ? "Volver" : "Seguir Editando"}
+            </Text>
+          </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => {
-                  onClose();
-                  onConfirmSave();
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-                <Text style={styles.primaryButtonText}>Guardar y Publicar</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            /* --- VISTA DEL CLIENTE (Quiere contratar) --- */
+          {onContact && (
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={onContact}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-ellipses" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.primaryButtonText}>Contactar</Text>
+            </TouchableOpacity>
+          )}
+
+          {onConfirmSave && (
             <TouchableOpacity
               style={[
                 styles.primaryButton,

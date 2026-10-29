@@ -1,81 +1,102 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  StyleSheet,
-} from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { useAccessibility } from '@/context/AccessibilityContext';
-import { CLIENT_CHATS, PRO_CHATS } from '@/constants/mockChatData';
 import type { ChatSession, UserRole } from '@/types/chat';
 import { MessagesList } from '@/components/chat/MessagesList';
 import { ActiveConversation } from '@/components/chat/ActiveConversation';
 import { useAuth } from '@/context/AuthContext';
+import { apiClient } from '@/utils/api';
 
 export default function ChatScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  
   const colors = useTheme();
   const { isDarkMode: isDark } = useAccessibility();
+  const { chatId } = useLocalSearchParams<{ chatId?: string }>();
 
-  // Detección automática del rol según el usuario autenticado
-  const { usuario } = useAuth();
+  const { usuario, token } = useAuth();
   const activeRole: UserRole =
     usuario?.rol === 'PROFESIONAL' ? 'PROFESIONAL' : 'CLIENTE';
 
-  const [chats, setChats] = useState<ChatSession[]>(() =>
-    activeRole === 'PROFESIONAL' ? PRO_CHATS : CLIENT_CHATS
-  );
+  const [chats, setChats] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setChats(activeRole === 'PROFESIONAL' ? PRO_CHATS : CLIENT_CHATS);
-  }, [activeRole]);
+  const fetchConversaciones = () => {
+    if (!token) {
+      setChats([]);
+      return;
+    }
 
-  const activeChat = chats.find((c) => c.id === activeChatId) || null;
-
-  const handleSendMessage = (chatId: string, text: string) => {
-    const currentPersonId =
-      activeRole === 'CLIENTE' ? 'user-client-1' : 'pro-daniela';
-
-    const newMessage = {
-      id: `msg-${Date.now()}`,
-      senderId: currentPersonId,
-      text,
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      dateLabel: 'Hoy',
-    };
-
-    setChats((prev) =>
-      prev.map((c) => {
-        if (c.id === chatId) {
-          return {
-            ...c,
-            lastMessage: text,
-            timestamp: 'Ahora',
-            messages: [...c.messages, newMessage],
-          };
+    apiClient('/api/chat/conversaciones')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.conversaciones) {
+          setChats(data.conversaciones);
+        } else {
+          setChats([]);
         }
-        return c;
       })
-    );
+      .catch((err) => {
+        console.error('Error al cargar conversaciones:', err);
+        setChats([]);
+      });
   };
 
-  const handleReleaseFunds = (chatId: string) => {
+  useEffect(() => {
+    fetchConversaciones();
+  }, [activeRole, token]);
+
+  useEffect(() => {
+    if (chatId) {
+      setActiveChatId(chatId);
+      fetchConversaciones();
+    }
+  }, [chatId]);
+
+  const activeChat =
+    chats.find((c) => c.id === activeChatId) ||
+    (activeChatId
+      ? ({
+        id: activeChatId,
+        client: {
+          id: usuario?.id || '',
+          name: `${usuario?.nombre || ''} ${usuario?.apellido || ''}`.trim() || 'Cliente',
+          profession: 'Cliente',
+          avatar: null,
+          isVerified: true,
+          role: 'CLIENTE',
+        },
+        professional: {
+          id: '',
+          name: 'Profesional',
+          profession: 'Servicio',
+          avatar: null,
+          isVerified: true,
+          role: 'PROFESIONAL',
+        },
+        lastMessage: '',
+        timestamp: 'Ahora',
+        unreadCount: 0,
+        status: 'EN PROGRESO',
+        escrowStatus: 'HELD',
+        escrowAmount: '$0',
+        messages: [],
+      } as ChatSession)
+      : null);
+
+  const handleSendMessage = (targetChatId: string, text: string) => {
+  };
+
+  const handleReleaseFunds = (targetChatId: string) => {
     setChats((prev) =>
-      prev.map((c) => {
-        if (c.id === chatId) {
-          return {
-            ...c,
-            escrowStatus: 'RELEASED',
-            status: 'COMPLETADO',
-          };
-        }
-        return c;
-      })
+      prev.map((c) =>
+        c.id === targetChatId
+          ? { ...c, escrowStatus: 'RELEASED', status: 'COMPLETADO' }
+          : c
+      )
     );
   };
 
@@ -89,14 +110,17 @@ export default function ChatScreen() {
         },
       ]}
     >
-      {/* Vistas: Lista de chats o conversación activa */}
       {activeChat ? (
         <ActiveConversation
           chat={activeChat}
           activeRole={activeRole}
           colors={colors}
           isDark={isDark}
-          onBack={() => setActiveChatId(null)}
+          onBack={() => {
+            setActiveChatId(null);
+            router.setParams({ chatId: '' });
+            fetchConversaciones();
+          }}
           onSendMessage={handleSendMessage}
           onReleaseFunds={handleReleaseFunds}
         />
