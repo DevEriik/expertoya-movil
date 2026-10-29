@@ -1,21 +1,23 @@
 import Constants from 'expo-constants';
+import { Platform, DeviceEventEmitter } from 'react-native';
 import { getToken } from './secureStore';
-import { DeviceEventEmitter, Platform } from 'react-native';
-
 const getBaseApiUrl = (): string => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            return 'http://localhost:3000';
+    if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined' && window.location) {
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                return 'http://localhost:3000';
+            }
+            return `http://${window.location.hostname}:3000`;
         }
-        return `http://${window.location.hostname}:3000`;
+        return 'http://localhost:3000';
     }
 
     if (process.env.EXPO_PUBLIC_API_URL) {
         return process.env.EXPO_PUBLIC_API_URL;
     }
 
-    const hostIp = Constants.expoConfig?.hostUri?.split(":")[0];
-    return hostIp ? `http://${hostIp}:3000` : "http://localhost:3000";
+    const hostIp = Constants.expoConfig?.hostUri?.split(':')[0];
+    return hostIp ? `http://${hostIp}:3000` : 'http://localhost:3000';
 };
 
 export const API_URL = getBaseApiUrl();

@@ -22,6 +22,7 @@ interface ProfilePreviewModalProps {
   visible: boolean;
   onClose: () => void;
   onConfirmSave?: () => void;
+  onContact?: () => void;
   nombre: string;
   apellido: string;
   fotoPerfil?: string;
@@ -38,6 +39,7 @@ export default function ProfilePreviewModal({
   visible,
   onClose,
   onConfirmSave,
+  onContact,
   nombre,
   apellido,
   fotoPerfil,
@@ -515,7 +517,7 @@ export default function ProfilePreviewModal({
             activeOpacity={0.7}
           >
             <Ionicons
-              name="create-outline"
+              name={onContact ? "arrow-back" : "create-outline"}
               size={18}
               color={isDark ? "#FDFCF4" : "#283593"}
             />
@@ -525,9 +527,20 @@ export default function ProfilePreviewModal({
                 { color: isDark ? "#FDFCF4" : "#283593" },
               ]}
             >
-              Seguir Editando
+              {onContact ? "Volver" : "Seguir Editando"}
             </Text>
           </TouchableOpacity>
+
+          {onContact && (
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={onContact}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-ellipses" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.primaryButtonText}>Contactar</Text>
+            </TouchableOpacity>
+          )}
 
           {onConfirmSave && (
             <TouchableOpacity
