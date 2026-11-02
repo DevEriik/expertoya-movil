@@ -47,3 +47,6 @@ example
 
 # Agents
 AGENTS.md
+
+google-services.json
+GoogleService-Info.plist

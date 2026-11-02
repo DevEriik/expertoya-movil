@@ -1,6 +1,6 @@
-import { useTheme } from "@/hooks/use-theme";
 import { useAccessibility } from "@/context/AccessibilityContext";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/hooks/use-theme";
 import { getRoleLabel, isAdmin } from "@/utils/roles";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -160,6 +160,50 @@ export default function SettingsScreen() {
               ]}
             >
               Configuración de Mercado Pago y Billetera (Pago Escrow)
+            </Text>
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={isDark ? "#555" : "#C4C4C4"}
+          />
+        </TouchableOpacity>
+
+        <View
+          style={[
+            styles.divider,
+            { backgroundColor: isDark ? "#333" : "#F0F0F0" },
+          ]}
+        />
+
+        {/* Bandeja de notificaciones */}
+        <TouchableOpacity
+          style={styles.listItem}
+          onPress={() => router.push("/notificaciones")}
+        >
+          <View
+            style={[
+              styles.iconContainer,
+              { backgroundColor: isDark ? "#003366" : "#E8F0FE" },
+            ]}
+          >
+            <Ionicons
+              name="file-tray-full-outline"
+              size={24}
+              color={isDark ? "#66B2FF" : "#1A73E8"}
+            />
+          </View>
+          <View style={styles.itemTextContainer}>
+            <Text
+              style={[
+                styles.itemTitle,
+                { color: isDark ? "#FFFFFF" : "#1A237E" },
+              ]}
+            >
+              Bandeja de Notificaciones
+            </Text>
+            <Text style={[styles.itemSubtitle, { color: "#8A92A6" }]}>
+              Historial de avisos, mensajes y alertas
             </Text>
           </View>
           <Ionicons
