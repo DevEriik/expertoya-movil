@@ -1,6 +1,11 @@
+import * as Notifications from "expo-notifications";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { DeviceEventEmitter } from "react-native";
 import { apiClient } from "../utils/api";
+import {
+  registerPushToken,
+  resetPushTokenCache,
+} from "../utils/pushNotifications";
 import { normalizeRole, UserRole } from "../utils/roles";
 import { deleteToken, getToken, saveToken } from "../utils/secureStore";
 
@@ -64,6 +69,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  useEffect(() => {
+    if (!token) return;
+
+    registerPushToken().catch((error) => {
+      console.warn("No se pudo registrar el token push:", error);
+    });
+
+    const subscription = Notifications.addPushTokenListener(() => {
+      registerPushToken({ force: true }).catch((error) => {
+        console.warn("No se pudo refrescar el token push:", error);
+      });
+    });
+
+    return () => subscription.remove();
+  }, [token]);
+
   const login = async (newToken: string, newUsuario: Usuario) => {
     const normalizedUsuario = {
       ...newUsuario,
@@ -92,6 +113,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       await deleteToken("auth_token");
       await deleteToken("usuario_data");
       await deleteToken("user_data");
+      resetPushTokenCache();
+      await Notifications.dismissAllNotificationsAsync().catch(() => {});
+      await Notifications.setBadgeCountAsync(0).catch(() => {});
     }
   };
 
