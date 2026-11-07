@@ -1,11 +1,28 @@
 import { AdminNotice } from "@/components/AdminNotice";
-import { Colors } from "@/constants/theme";
+import { useAccessibility } from "@/context/AccessibilityContext";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/hooks/use-theme";
+import {
+  getSonidoActivo,
+  setSonidoActivo,
+} from "@/utils/notificationPreferences";
+import {
+  getNotificationPermissionInfo,
+  openNotificationSettings,
+  requestNotificationPermissions,
+  type NotificationPermissionInfo,
+} from "@/utils/notifications";
+import {
+  describirErrorPush,
+  registerPushToken,
+} from "@/utils/pushNotifications";
 import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   ScrollView,
   StyleSheet,
@@ -14,8 +31,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme } from "@/hooks/use-theme";
-import { useAccessibility } from "@/context/AccessibilityContext";
 
 const CustomSwitch = ({
   value,
@@ -85,10 +100,117 @@ export default function NotificationsScreen() {
   const [newRequests, setNewRequests] = useState(true);
   const [quotesReceived, setQuotesReceived] = useState(true);
   const [jobStatus, setJobStatus] = useState(true);
+  const [sonidoActivo, setSonidoActivoState] = useState(true);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionInfo | null>(null);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [registrandoPush, setRegistrandoPush] = useState(false);
 
   const admin = isAdmin(usuario?.rol);
   const showProSection = admin || isProfesional(usuario?.rol);
   const showClientSection = admin || isCliente(usuario?.rol);
+
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+
+      getNotificationPermissionInfo()
+        .then((info) => {
+          if (!mounted) return;
+          setNotificationPermission(info);
+          if (info.state === "granted") {
+            void registrarPush();
+          }
+        })
+        .catch((error) => {
+          console.warn("No se pudo leer el permiso de notificaciones:", error);
+        });
+
+      return () => {
+        mounted = false;
+      };
+    }, []),
+  );
+
+  const registrarPush = useCallback(async (forzar = false) => {
+    setRegistrandoPush(true);
+
+    try {
+      await registerPushToken({ force: forzar });
+      setPushError(null);
+    } catch (error) {
+      console.warn("No se pudo registrar el token push:", error);
+      setPushError(describirErrorPush(error));
+    } finally {
+      setRegistrandoPush(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    getSonidoActivo()
+      .then((valor) => setSonidoActivoState(valor))
+      .catch((error) => {
+        console.warn("No se pudo leer la preferencia de sonido:", error);
+      });
+  }, []);
+
+  const permissionGranted = notificationPermission?.state === "granted";
+  const permissionDenied = notificationPermission?.state === "denied";
+
+  const handleNotificationPermission = async () => {
+    if (isRequestingPermission) return;
+
+    setIsRequestingPermission(true);
+
+    try {
+      if (permissionDenied && !notificationPermission?.canAskAgain) {
+        await openNotificationSettings();
+        return;
+      }
+
+      const info = await requestNotificationPermissions();
+      setNotificationPermission(info);
+
+      if (info.state === "granted") {
+        void registrarPush();
+      }
+
+      if (info.state === "denied") {
+        Alert.alert(
+          "Notificaciones bloqueadas",
+          "Podés habilitarlas desde los ajustes del sistema.",
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Abrir ajustes",
+              onPress: () => {
+                void openNotificationSettings();
+              },
+            },
+          ],
+        );
+      }
+    } catch (error) {
+      console.warn("No se pudo solicitar el permiso de notificaciones:", error);
+      Alert.alert(
+        "Error",
+        "No se pudo solicitar el permiso de notificaciones.",
+      );
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
+
+  const handleSonido = (valor: boolean) => {
+    setSonidoActivoState(valor);
+
+    setSonidoActivo(valor).catch((error) => {
+      console.warn("No se pudo guardar la preferencia de sonido:", error);
+      setSonidoActivoState(!valor);
+    });
+  };
+
   const workTitle = admin
     ? "Solicitudes, Trabajos y Mensajes"
     : isProfesional(usuario?.rol)
@@ -152,6 +274,164 @@ export default function NotificationsScreen() {
         {admin && (
           <AdminNotice message="Vista de administrador: ves las secciones de cliente y profesional." />
         )}
+
+        <View
+          style={[styles.card, { backgroundColor: colors.backgroundElement }]}
+        >
+          <View style={styles.cardHeader}>
+            <Ionicons
+              name="notifications-outline"
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              Permiso del sistema
+            </Text>
+          </View>
+
+          <View style={styles.settingRow}>
+            <View style={styles.textContainer}>
+              <Text style={[styles.settingTitle, { color: colors.text }]}>
+                {permissionGranted
+                  ? "Notificaciones habilitadas"
+                  : permissionDenied
+                    ? "Notificaciones bloqueadas"
+                    : "Notificaciones desactivadas"}
+              </Text>
+              <Text
+                style={[
+                  styles.settingSubtitle,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {permissionGranted
+                  ? "La app puede mostrarte avisos y alertas."
+                  : permissionDenied
+                    ? "Habilitá el permiso desde los ajustes del sistema."
+                    : "Activá el permiso para recibir avisos importantes."}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleNotificationPermission}
+              disabled={isRequestingPermission || permissionGranted}
+              style={[
+                styles.permissionButton,
+                {
+                  backgroundColor: permissionGranted
+                    ? colors.successBg
+                    : colors.primary,
+                },
+                (isRequestingPermission || permissionGranted) && {
+                  opacity: 0.6,
+                },
+              ]}
+            >
+              {isRequestingPermission ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text
+                  style={[
+                    styles.permissionButtonText,
+                    {
+                      color: permissionGranted ? colors.success : "#FFFFFF",
+                    },
+                  ]}
+                >
+                  {permissionGranted
+                    ? "Activo"
+                    : permissionDenied
+                      ? "Abrir ajustes"
+                      : "Activar"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View
+            style={[
+              styles.divider,
+              { backgroundColor: colors.backgroundSelected },
+            ]}
+          />
+
+          <View style={styles.settingRow}>
+            <View style={styles.textContainer}>
+              <Text
+                style={[
+                  styles.settingTitle,
+                  { color: pushError ? "#EF4444" : colors.text },
+                ]}
+              >
+                {!permissionGranted
+                  ? "Dispositivo sin registrar"
+                  : pushError
+                    ? "No se pudo registrar el dispositivo"
+                    : "Dispositivo registrado"}
+              </Text>
+              <Text
+                style={[
+                  styles.settingSubtitle,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {!permissionGranted
+                  ? "Concedé el permiso para recibir notificaciones."
+                  : pushError
+                    ? pushError
+                    : "Este teléfono va a recibir las notificaciones."}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => registrarPush(true)}
+              disabled={!permissionGranted || registrandoPush}
+              style={[
+                styles.permissionButton,
+                { backgroundColor: colors.backgroundSelected },
+                (!permissionGranted || registrandoPush) && { opacity: 0.6 },
+              ]}
+            >
+              {registrandoPush ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <Text
+                  style={[styles.permissionButtonText, { color: colors.text }]}
+                >
+                  {pushError ? "Reintentar" : "Verificar"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View
+          style={[styles.card, { backgroundColor: colors.backgroundElement }]}
+        >
+          <View style={styles.cardHeader}>
+            <Ionicons
+              name={
+                sonidoActivo ? "volume-high-outline" : "volume-mute-outline"
+              }
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              Sonido
+            </Text>
+          </View>
+
+          <FigmaToggle
+            title="Sonido de notificaciones"
+            subtitle={
+              sonidoActivo
+                ? "Los avisos suenan cuando la app está abierta."
+                : "Los avisos llegan sin sonido ni banner."
+            }
+            value={sonidoActivo}
+            onValueChange={handleSonido}
+          />
+        </View>
         <View
           style={[styles.card, { backgroundColor: colors.backgroundElement }]}
         >
@@ -302,4 +582,16 @@ const styles = StyleSheet.create({
   settingTitle: { fontSize: 15, fontWeight: "700", marginBottom: 4 },
   settingSubtitle: { fontSize: 13, fontWeight: "500" },
   divider: { height: 1, marginHorizontal: 16 },
+  permissionButton: {
+    minWidth: 92,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  permissionButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
 });
