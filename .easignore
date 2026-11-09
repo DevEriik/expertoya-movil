@@ -1,0 +1,62 @@
+# dependencies
+
+node_modules/
+
+# Expo
+
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Environment variables
+
+.env*
+.env*.local
+
+# Native
+
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+
+.metro-health-check*
+
+# debug
+
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+
+.DS_Store
+*.pem
+
+# typescript
+
+*.tsbuildinfo
+
+example
+
+# generated native folders
+
+/ios
+/android
+
+# Agents
+
+AGENTS.md
+
+google-services.json
+GoogleService-Info.plist
+
+# EAS: incluir google-services.json en el upload sin commitearlo
+
+!google-services.json
