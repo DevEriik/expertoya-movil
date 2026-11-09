@@ -16,7 +16,15 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.expertoyamovil"
+      "package": "com.anonymous.expertoyamovil",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "ACCESS_NETWORK_STATE",
+        "BLUETOOTH",
+        "VIBRATE"
+      ]
     },
     "web": {
       "output": "static",
@@ -40,7 +48,8 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-audio"
+      "expo-audio",
+      "@config-plugins/react-native-webrtc"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -51,6 +60,14 @@
       "eas": {
         "projectId": "f3055919-a386-43ab-94ac-571afb4b39a5"
       }
+    },
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "ExpertoYa requiere acceso a la cámara para realizar diagnósticos visuales en vivo entre clientes y especialistas.",
+        "NSMicrophoneUsageDescription": "ExpertoYa requiere acceso al micrófono para comunicarse por voz durante la videollamada de diagnóstico."
+      },
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.expertoyamovil"
     }
   }
 }

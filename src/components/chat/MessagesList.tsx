@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 import type { ChatSession, UserRole } from '../../types/chat';
 import { ChatStatusBadge } from './ChatStatusBadge';
 
@@ -28,6 +29,7 @@ export const MessagesList: React.FC<Props> = ({
   isDark = false,
 }) => {
   const router = useRouter();
+  const { usuario } = useAuth();
   const [dismissedPromptId, setDismissedPromptId] = useState<string | null>(null);
 
   // Para el profesional: detectar si hay un chat entrante reciente para mostrar el prompt de respuesta
@@ -143,8 +145,11 @@ export const MessagesList: React.FC<Props> = ({
       ) : (
         <View style={styles.list}>
           {chats.map((chat) => {
-            const otherPerson =
-              activeRole === 'CLIENTE' ? chat.professional : chat.client;
+            const isUserTheProfessional =
+              (usuario?.id && chat.professional?.id && usuario.id === chat.professional.id) ||
+              (usuario?.id && chat.client?.id && usuario.id !== chat.client.id) ||
+              activeRole === 'PROFESIONAL';
+            const otherPerson = isUserTheProfessional ? chat.client : chat.professional;
 
             const imageSource =
               typeof otherPerson.avatar === 'string' && otherPerson.avatar.trim() !== ''
