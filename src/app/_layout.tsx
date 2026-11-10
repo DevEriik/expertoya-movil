@@ -253,6 +253,15 @@ function RootNavigation() {
               animation: "slide_from_right",
             }}
           />
+          <Stack.Screen
+            name="call/[id]"
+            options={{
+              title: "Videollamada de Diagnóstico",
+              headerShown: false,
+              animation: "fade",
+              gestureEnabled: false,
+            }}
+          />
         </Stack>
       </AuthProvider>
     </ThemeProvider>

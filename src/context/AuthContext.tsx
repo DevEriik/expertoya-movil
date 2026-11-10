@@ -61,6 +61,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setToken(storedToken);
         const parsed = JSON.parse(storedUsuario);
         setUsuario({ ...parsed, rol: normalizeRole(parsed.rol) });
+
+        apiClient("/api/auth/me")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data?.usuarioAutenticado) {
+              const fresh = {
+                ...parsed,
+                ...data.usuarioAutenticado,
+                rol: normalizeRole(data.usuarioAutenticado.rol),
+              };
+              setUsuario(fresh);
+              saveToken("usuario_data", JSON.stringify(fresh));
+            }
+          })
+          .catch((err) => {
+            console.warn("[AuthContext] No se pudo refrescar perfil en inicio:", err);
+          });
       }
     } catch (error) {
       console.error("Failed to load auth data", error);
