@@ -34,7 +34,7 @@ interface ProfilePreviewModalProps {
   totalReviews?: number;
   servicios?: ServicioPublicadoItem[];
   aniosExperiencia?: string;
-  profesionalId: string;
+  profesionalId?: string;
 }
 
 export default function ProfilePreviewModal({
@@ -52,7 +52,7 @@ export default function ProfilePreviewModal({
   totalReviews = 310,
   servicios,
   aniosExperiencia,
-  profesionalId,
+  profesionalId = "",
 }: ProfilePreviewModalProps) {
   const insets = useSafeAreaInsets();
   const colors = useTheme();

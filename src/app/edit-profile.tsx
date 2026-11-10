@@ -1643,6 +1643,7 @@ export default function EditProfileScreen() {
         visible={showPreview}
         onClose={() => setShowPreview(false)}
         onConfirmSave={handleSave}
+        profesionalId={usuario?.id || ""}
         nombre={nombre}
         apellido={apellido}
         fotoPerfil={getSafeAvatarUri(avatarUri)}

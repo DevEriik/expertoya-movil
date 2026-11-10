@@ -1,6 +1,7 @@
 import { getToken, saveToken } from "@/utils/secureStore";
+import Constants from "expo-constants";
 import * as Location from "expo-location";
-import * as Notifications from "expo-notifications";
+import * as Notifications from "@/utils/safeNotifications";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -27,24 +28,28 @@ import { AppState } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => {
-    const sonidoActivo = await getSonidoActivo();
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => {
+      const sonidoActivo = await getSonidoActivo();
 
-    return {
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: sonidoActivo,
-      shouldSetBadge: true,
-    };
-  },
-  handleError: (notificationId, error) => {
-    console.warn(
-      `No se pudo mostrar la notificación ${notificationId}:`,
-      error,
-    );
-  },
-});
+      return {
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: sonidoActivo,
+        shouldSetBadge: true,
+      };
+    },
+    handleError: (notificationId: string, error: any) => {
+      console.warn(
+        `No se pudo mostrar la notificación ${notificationId}:`,
+        error,
+      );
+    },
+  });
+} catch (err) {
+  console.warn("Notifications handler no disponible en este entorno:", err);
+}
 
 function AuthGate() {
   const { usuario, isLoading } = useAuth();
@@ -108,23 +113,25 @@ function NotificationDeepLinkHandler() {
   );
 
   useEffect(() => {
-    const subscription =
-      Notifications.addNotificationResponseReceivedListener(encolar);
-
-    return () => subscription.remove();
+    try {
+      const subscription =
+        Notifications.addNotificationResponseReceivedListener(encolar);
+      return () => subscription.remove();
+    } catch {
+      return () => {};
+    }
   }, [encolar]);
 
   useEffect(() => {
-    Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
-        if (response) encolar(response);
-      })
-      .catch((error) => {
-        console.warn(
-          "No se pudo leer la notificación que abrió la app:",
-          error,
-        );
-      });
+    if (Constants.appOwnership === "expo") return;
+
+    try {
+      Notifications.getLastNotificationResponseAsync()
+        .then((response: any) => {
+          if (response) encolar(response);
+        })
+        .catch(() => {});
+    } catch {}
   }, [encolar]);
 
   useEffect(() => {
@@ -134,13 +141,17 @@ function NotificationDeepLinkHandler() {
   }, [isLoading, usuario]);
 
   useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(() => {
-      setTimeout(() => {
-        syncBadgeCount().catch(() => {});
-      }, 1000);
-    });
+    try {
+      const subscription = Notifications.addNotificationReceivedListener(() => {
+        setTimeout(() => {
+          syncBadgeCount().catch(() => {});
+        }, 1000);
+      });
 
-    return () => subscription.remove();
+      return () => subscription.remove();
+    } catch {
+      return () => {};
+    }
   }, []);
 
   useEffect(() => {

@@ -44,6 +44,10 @@ export function useVideoCall({
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   const isChatActive = chatStatus === 'active';
+  const onCallEndRef = useRef(onCallEnd);
+  useEffect(() => {
+    onCallEndRef.current = onCallEnd;
+  }, [onCallEnd]);
 
   /**
    * Limpieza exhaustiva de la llamada y liberación de recursos de hardware
@@ -157,10 +161,10 @@ export function useVideoCall({
   const handleHangUp = useCallback(async () => {
     isHangingUpRef.current = true;
     await cleanupCall();
-    if (onCallEnd) {
-      onCallEnd('Llamada finalizada por el usuario');
+    if (onCallEndRef.current) {
+      onCallEndRef.current('Llamada finalizada por el usuario');
     }
-  }, [cleanupCall, onCallEnd]);
+  }, [cleanupCall]);
 
   useEffect(() => {
     if (!isChatActive) return;
@@ -303,7 +307,7 @@ export function useVideoCall({
     return () => {
       cleanupCall();
     };
-  }, [roomUrl, token, userName, isChatActive, cleanupCall, syncParticipants, handleHangUp, onCallEnd]);
+  }, [roomUrl, token, userName, isChatActive, cleanupCall, syncParticipants, handleHangUp]);
 
   const backgroundTimerRef = useRef<any>(null);
 

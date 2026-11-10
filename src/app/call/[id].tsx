@@ -64,6 +64,19 @@ export default function CallScreen() {
 
   const decodedRoomUrl = roomUrl ? decodeURIComponent(roomUrl) : '';
 
+  const [callDuration, setCallDuration] = React.useState<number>(0);
+  const callDurationRef = useRef(0);
+  callDurationRef.current = callDuration;
+
+  const handleOnCallEnd = React.useCallback((reason?: string) => {
+    if (socketRef.current?.connected && solicitudId) {
+      socketRef.current.emit('call:end', { solicitud_id: solicitudId, duracion: callDurationRef.current });
+    }
+    setTimeout(() => {
+      router.back();
+    }, 250);
+  }, [solicitudId, router]);
+
   const {
     callState,
     errorMessage,
@@ -82,14 +95,7 @@ export default function CallScreen() {
     userName,
     userRole,
     chatStatus: 'active',
-    onCallEnd: (reason) => {
-      if (socketRef.current?.connected && solicitudId) {
-        socketRef.current.emit('call:end', { solicitud_id: solicitudId, duracion: callDuration });
-      }
-      setTimeout(() => {
-        router.back();
-      }, 250);
-    },
+    onCallEnd: handleOnCallEnd,
   });
 
   useEffect(() => {
@@ -120,8 +126,6 @@ export default function CallScreen() {
       socket.disconnect();
     };
   }, [token, solicitudId, router]);
-
-  const [callDuration, setCallDuration] = React.useState<number>(0);
 
   useEffect(() => {
     if (callState !== 'connected') {
