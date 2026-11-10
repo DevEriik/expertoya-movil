@@ -19,7 +19,9 @@ export default function ChatScreen() {
 
   const { usuario, token } = useAuth();
   const activeRole: UserRole =
-    usuario?.rol === 'PROFESIONAL' ? 'PROFESIONAL' : 'CLIENTE';
+    (usuario?.rol === 'PROFESIONAL' || usuario?.profesional != null)
+      ? 'PROFESIONAL'
+      : 'CLIENTE';
 
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -56,27 +58,46 @@ export default function ChatScreen() {
     }
   }, [chatId]);
 
+  const isProRole = activeRole === 'PROFESIONAL';
   const activeChat =
     chats.find((c) => c.id === activeChatId) ||
     (activeChatId
       ? ({
         id: activeChatId,
-        client: {
-          id: usuario?.id || '',
-          name: `${usuario?.nombre || ''} ${usuario?.apellido || ''}`.trim() || 'Cliente',
-          profession: 'Cliente',
-          avatar: null,
-          isVerified: true,
-          role: 'CLIENTE',
-        },
-        professional: {
-          id: '',
-          name: 'Profesional',
-          profession: 'Servicio',
-          avatar: null,
-          isVerified: true,
-          role: 'PROFESIONAL',
-        },
+        client: isProRole
+          ? {
+            id: '',
+            name: 'Cliente',
+            profession: 'Cliente',
+            avatar: null,
+            isVerified: true,
+            role: 'CLIENTE',
+          }
+          : {
+            id: usuario?.id || '',
+            name: `${usuario?.nombre || ''} ${usuario?.apellido || ''}`.trim() || 'Cliente',
+            profession: 'Cliente',
+            avatar: null,
+            isVerified: true,
+            role: 'CLIENTE',
+          },
+        professional: isProRole
+          ? {
+            id: usuario?.id || '',
+            name: `${usuario?.nombre || ''} ${usuario?.apellido || ''}`.trim() || 'Profesional',
+            profession: 'Servicio',
+            avatar: null,
+            isVerified: true,
+            role: 'PROFESIONAL',
+          }
+          : {
+            id: '',
+            name: 'Profesional',
+            profession: 'Servicio',
+            avatar: null,
+            isVerified: true,
+            role: 'PROFESIONAL',
+          },
         lastMessage: '',
         timestamp: 'Ahora',
         unreadCount: 0,

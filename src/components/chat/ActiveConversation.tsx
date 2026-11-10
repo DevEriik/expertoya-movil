@@ -16,6 +16,9 @@ import {
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { IncomingCallModal } from './IncomingCallModal';
+import { OutgoingCallModal } from './OutgoingCallModal';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useAuth } from '@/context/AuthContext';
 import { useChatSocket } from '@/hooks/useChatSocket';
@@ -135,11 +138,16 @@ export const ActiveConversation: React.FC<Props> = ({
   const { voiceDictation, scaleFont } = useAccessibility();
   const { usuario, token } = useAuth();
 
-  const otherPerson =
-    activeRole === 'CLIENTE' ? chat.professional : chat.client;
-  const currentPerson =
-    activeRole === 'CLIENTE' ? chat.client : chat.professional;
+  const isUserTheProfessional =
+    (usuario?.id && chat.professional?.id && usuario.id === chat.professional.id) ||
+    (usuario?.id && chat.client?.id && usuario.id !== chat.client.id) ||
+    activeRole === 'PROFESIONAL';
 
+  const otherPerson = isUserTheProfessional ? chat.client : chat.professional;
+  const currentPerson = isUserTheProfessional ? chat.professional : chat.client;
+  const effectiveRole: UserRole = isUserTheProfessional ? 'PROFESIONAL' : 'CLIENTE';
+
+  const router = useRouter();
   const currentUserId = usuario?.id || currentPerson.id;
 
   const {
@@ -155,11 +163,35 @@ export const ActiveConversation: React.FC<Props> = ({
     seleccionarYSubirFoto,
     subirNotaAudio,
     responderPropuesta,
+    llamadaEntrante,
+    llamadaSaliente,
+    salaUrlActiva,
+    iniciarVideollamada,
+    aceptarVideollamada,
+    rechazarVideollamada,
+    cancelarLlamadaSaliente,
+    setSalaUrlActiva,
   } = useChatSocket({
     solicitudId: chat.id,
     userId: currentUserId,
     token,
   });
+
+  useEffect(() => {
+    if (salaUrlActiva && chat.id) {
+      router.push({
+        pathname: '/call/[id]' as any,
+        params: {
+          id: chat.id,
+          roomUrl: encodeURIComponent(salaUrlActiva),
+          otherName: otherPerson.name,
+          otherAvatar: typeof otherPerson.avatar === 'string' ? otherPerson.avatar : '',
+          role: effectiveRole,
+        },
+      });
+      setSalaUrlActiva(null);
+    }
+  }, [salaUrlActiva, chat.id, otherPerson, effectiveRole, router, setSalaUrlActiva]);
 
   const [grabandoAudio, setGrabandoAudio] = useState(false);
   const [segundosGrabacion, setSegundosGrabacion] = useState(0);
@@ -626,16 +658,17 @@ export const ActiveConversation: React.FC<Props> = ({
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.videoButton}
-          onPress={() =>
-            Alert.alert('Videollamada', `Iniciando llamada segura con ${otherPerson.name}...`)
-          }
-          accessible={true}
-          accessibilityLabel="Iniciar videollamada"
-        >
-          <Ionicons name="videocam-outline" size={26} color="#00BFA5" />
-        </TouchableOpacity>
+        {!estaBloqueado && (
+          <TouchableOpacity
+            style={styles.videoButton}
+            onPress={iniciarVideollamada}
+            accessible={true}
+            accessibilityLabel="Iniciar videollamada de diagnóstico visual"
+            accessibilityRole="button"
+          >
+            <Ionicons name="videocam-outline" size={26} color="#00BFA5" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {estaBloqueado && (
@@ -792,6 +825,60 @@ export const ActiveConversation: React.FC<Props> = ({
             </View>
           ) : (
             listaMensajes.map((msg: any) => {
+              const isCallLog = typeof msg.text === 'string' && msg.text.startsWith('📞 Videollamada');
+              if (isCallLog) {
+                const isFinalizada = msg.text.includes('finalizada');
+                return (
+                  <View key={msg.id} style={styles.callSummaryRow}>
+                    <View
+                      style={[
+                        styles.callSummaryBadge,
+                        {
+                          backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : '#F1F5F9',
+                          borderColor: isFinalizada ? 'rgba(0, 191, 165, 0.4)' : 'rgba(255, 140, 0, 0.35)',
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.callSummaryIconCircle,
+                          { backgroundColor: isFinalizada ? '#00BFA5' : '#FF8C00' },
+                        ]}
+                      >
+                        <Ionicons
+                          name={isFinalizada ? 'videocam' : 'videocam-off'}
+                          size={15}
+                          color="#FFFFFF"
+                        />
+                      </View>
+                      <View style={{ flexShrink: 1 }}>
+                        <Text
+                          style={[
+                            styles.callSummaryTitle,
+                            { color: isDark ? '#F1F5F9' : '#1E293B' },
+                          ]}
+                        >
+                          {isFinalizada ? 'Videollamada de Diagnóstico' : 'Videollamada'}
+                        </Text>
+                        <Text style={styles.callSummarySubtitle}>
+                          {msg.text.replace('📞 Videollamada ', '')}
+                        </Text>
+                        {isFinalizada && effectiveRole === 'PROFESIONAL' && (
+                          <TouchableOpacity
+                            style={styles.callToActionBtn}
+                            onPress={() => setMostrarModalPropuesta(true)}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="calendar" size={13} color="#FFFFFF" />
+                            <Text style={styles.callToActionText}>Coordinar Visita Técnica</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <Text style={styles.callSummaryTime}>{msg.timestamp}</Text>
+                    </View>
+                  </View>
+                );
+              }
               const isCurrentUser = msg.senderId === currentUserId;
 
               return (
@@ -1355,43 +1442,7 @@ export const ActiveConversation: React.FC<Props> = ({
               onSubmitEditing={handleSend}
             />
 
-            {voiceDictation && !estaBloqueado && (
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor: isDark ? '#3A2200' : '#FEF3E0',
-                    borderWidth: 1.5,
-                    borderColor: colors.primary,
-                    marginRight: 4,
-                  },
-                ]}
-                onPress={() => {
-                  Alert.alert(
-                    'Dictado por Voz',
-                    'Dicta tu mensaje para añadirlo a la conversación.',
-                    [
-                      { text: 'Cancelar', style: 'cancel' },
-                      {
-                        text: 'Insertar dictado',
-                        onPress: () =>
-                          setInputText((prev) =>
-                            prev
-                              ? `${prev} Muchas gracias por la pronta respuesta.`
-                              : 'Muchas gracias por la respuesta.'
-                          ),
-                      },
-                    ]
-                  );
-                }}
-                activeOpacity={0.8}
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel="Dictar por voz"
-              >
-                <Ionicons name="mic-circle" size={22} color={colors.primary} />
-              </TouchableOpacity>
-            )}
+
 
             <TouchableOpacity
               style={[
@@ -1856,6 +1907,21 @@ export const ActiveConversation: React.FC<Props> = ({
           </View>
         </View>
       </Modal>
+
+      <IncomingCallModal
+        visible={Boolean(llamadaEntrante)}
+        invitation={llamadaEntrante}
+        onAccept={(inv) => {
+          aceptarVideollamada(inv);
+        }}
+        onReject={(inv) => rechazarVideollamada(inv)}
+      />
+
+      <OutgoingCallModal
+        visible={llamadaSaliente}
+        targetUser={otherPerson}
+        onCancel={cancelarLlamadaSaliente}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -1981,6 +2047,62 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  callSummaryRow: {
+    width: '100%',
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  callSummaryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    maxWidth: '85%',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  callSummaryIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  callSummaryTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  callSummarySubtitle: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  callToActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FF8C00',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  callToActionText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  callSummaryTime: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginLeft: 4,
   },
   messageRow: {
     flexDirection: 'row',

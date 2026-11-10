@@ -57,10 +57,9 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
   );
   const [highContrast, setHighContrastState] = useState<boolean>(false);
   const [textSize, setTextSizeState] = useState<TextSize>("Medium");
-  const [voiceDictation, setVoiceDictationState] = useState<boolean>(true);
+  const [voiceDictation, setVoiceDictationState] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Cargar preferencias guardadas al iniciar
   useEffect(() => {
     let isMounted = true;
 
@@ -174,7 +173,7 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
       isDarkMode: systemScheme === "dark",
       highContrast: false,
       textSize: "Medium",
-      voiceDictation: true,
+      voiceDictation: false,
     };
     setIsDarkModeState(defaults.isDarkMode);
     setHighContrastState(defaults.highContrast);

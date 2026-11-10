@@ -162,3 +162,20 @@ export const buildGoogleCalendarUrl = (
   )}&dates=${dates}`;
 };
 
+
+
+export interface VideoCallInvitation {
+  solicitud_id: string;
+  roomUrl: string;
+  roomName: string;
+  caller: {
+    id: string;
+    name: string;
+    avatar?: string | null;
+    role: UserRole;
+  };
+  sesion_id?: string;
+}
+
+export type VideoCallQuality = 'good' | 'low';
+export type VideoCallState = 'idle' | 'joining' | 'connected' | 'error' | 'disconnected';

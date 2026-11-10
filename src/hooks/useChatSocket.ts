@@ -4,7 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert, Platform } from 'react-native';
 import { apiClient, API_URL } from '@/utils/api';
-import { MensajeChatModel } from '@/types/chat';
+import { MensajeChatModel, VideoCallInvitation } from '@/types/chat';
 
 interface UseChatSocketParams {
   solicitudId: string;
@@ -22,6 +22,9 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
   const [estadoSolicitud, setEstadoSolicitud] = useState<string>('');
   const [subiendoFoto, setSubiendoFoto] = useState<boolean>(false);
   const [otroUsuarioEscribiendo, setOtroUsuarioEscribiendo] = useState<boolean>(false);
+  const [llamadaEntrante, setLlamadaEntrante] = useState<VideoCallInvitation | null>(null);
+  const [llamadaSaliente, setLlamadaSaliente] = useState<boolean>(false);
+  const [salaUrlActiva, setSalaUrlActiva] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const typingSafetyTimeoutRef = useRef<any>(null);
   const typingDebounceTimeoutRef = useRef<any>(null);
@@ -200,6 +203,38 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
           m.id === data.mensaje_id ? { ...m, contenido: data.contenido } : m
         )
       );
+    });
+
+    socket.on('call:invite', (invitation: VideoCallInvitation) => {
+      console.log('📞 [useChatSocket] Invitación de llamada recibida:', invitation);
+      setLlamadaEntrante(invitation);
+    });
+
+    socket.on('call:ringing', () => {
+      setLlamadaSaliente(true);
+    });
+
+    socket.on('call:accepted', (data: { roomUrl: string }) => {
+      setLlamadaSaliente(false);
+      if (data?.roomUrl) setSalaUrlActiva(data.roomUrl);
+    });
+
+    socket.on('call:rejected', (data: { reason?: string }) => {
+      setLlamadaSaliente(false);
+      setLlamadaEntrante(null);
+      setSalaUrlActiva(null);
+      Alert.alert('Llamada Rechazada', data.reason || 'El usuario no pudo responder.');
+    });
+
+    socket.on('call:ended', () => {
+      setLlamadaSaliente(false);
+      setLlamadaEntrante(null);
+      setSalaUrlActiva(null);
+    });
+
+    socket.on('call:error', (data: { mensaje?: string }) => {
+      setLlamadaSaliente(false);
+      Alert.alert('Videollamada', data.mensaje || 'Error al iniciar videollamada.');
     });
 
     socket.on('error_chat', (err: { mensaje: string }) => {
@@ -534,7 +569,62 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
     }
   };
 
+  const iniciarVideollamada = useCallback(() => {
+    if (bloqueado) {
+      Alert.alert(
+        'Chat Cerrado',
+        'No es posible iniciar videollamada porque la conversación está cerrada.'
+      );
+      return;
+    }
+    if (!socketRef.current || !esSolicitudReal) return;
+    setLlamadaSaliente(true);
+    socketRef.current.emit(
+      'call:invite',
+      { solicitud_id: solicitudId },
+      (res: any) => {
+        if (res?.error) {
+          setLlamadaSaliente(false);
+          Alert.alert('Videollamada', res.error);
+        }
+      }
+    );
+  }, [bloqueado, esSolicitudReal, solicitudId]);
+
+  const aceptarVideollamada = useCallback((invitation: VideoCallInvitation) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('call:accept', { solicitud_id: invitation.solicitud_id });
+    setSalaUrlActiva(invitation.roomUrl);
+    setLlamadaEntrante(null);
+  }, []);
+
+  const rechazarVideollamada = useCallback((invitation: VideoCallInvitation, reason?: string) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('call:reject', {
+      solicitud_id: invitation.solicitud_id,
+      reason: reason || 'Llamada rechazada por el usuario',
+    });
+    setLlamadaEntrante(null);
+  }, []);
+
+  const cancelarLlamadaSaliente = useCallback(() => {
+    if (socketRef.current && esSolicitudReal) {
+      socketRef.current.emit('call:end', { solicitud_id: solicitudId });
+    }
+    setLlamadaSaliente(false);
+    setSalaUrlActiva(null);
+  }, [esSolicitudReal, solicitudId]);
+
   return {
+    llamadaEntrante,
+    llamadaSaliente,
+    salaUrlActiva,
+    iniciarVideollamada,
+    aceptarVideollamada,
+    rechazarVideollamada,
+    cancelarLlamadaSaliente,
+    setLlamadaEntrante,
+    setSalaUrlActiva,
     mensajes,
     cargando,
     bloqueado,

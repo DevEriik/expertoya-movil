@@ -12,11 +12,15 @@ const getBaseApiUrl = (): string => {
         return 'http://localhost:3000';
     }
 
+    const hostIp = Constants.expoConfig?.hostUri?.split(':')[0];
+    if (hostIp && !hostIp.includes('localhost') && !hostIp.includes('127.0.0.1')) {
+        return `http://${hostIp}:3000`;
+    }
+
     if (process.env.EXPO_PUBLIC_API_URL) {
         return process.env.EXPO_PUBLIC_API_URL;
     }
 
-    const hostIp = Constants.expoConfig?.hostUri?.split(':')[0];
     return hostIp ? `http://${hostIp}:3000` : 'http://localhost:3000';
 };
 
