@@ -44,6 +44,8 @@ export default function AccountDetailsScreen() {
     useState<ServicioPublicadoItem | null>(null);
   const [isDeletingService, setIsDeletingService] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
+const [solicitudesCount, setSolicitudesCount] = useState(0);
+
 
   const [profile, setProfile] = useState({
     nombre: usuario?.nombre || "Usuario",
@@ -87,7 +89,23 @@ export default function AccountDetailsScreen() {
           console.log("Error al cargar el perfil.");
         }
       };
-
+    
+      const fetchSolicitudesCount = async () => {
+        try {
+          const res = await apiClient("/api/solicitudes/recibidas");
+          if (res.ok) {
+            const data = await res.json();
+            const list = data.data || [];
+            const pendientes = list.filter(
+              (s: any) => s.estado === "PENDIENTE",
+            );
+            setSolicitudesCount(pendientes.length);
+          }
+        } catch (e) {
+          console.log("Error al cargar contador de solicitudes:", e);
+        }
+      };
+      
       const loadServices = async () => {
         try {
           const list = await getServices();
@@ -97,11 +115,13 @@ export default function AccountDetailsScreen() {
         }
       };
 
+      
       fetchProfile();
       loadServices();
+      fetchSolicitudesCount(); 
     }, [usuario]),
   );
-
+  
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener("servicesChanged", async () => {
       const list = await getServices();
@@ -421,10 +441,11 @@ export default function AccountDetailsScreen() {
                 <FigmaActionCard
                   icon="list-outline"
                   title="Historial de Solicitudes"
-                  subtitle="Todavía no has solicitado ningún servicio. Explora el directorio para encontrar profesionales cerca de ti."
+                  subtitle="Visualiza el estado de los servicios que has solicitado a los profesionales."
                   iconColor={(colors as any).info || "#1A73E8"}
-                  buttonText="Buscar Profesionales"
-                  onPress={() => router.push("/(tabs)")}
+                  buttonText="Ver Mis Solicitudes"
+                
+                  onPress={() => router.push("/mis-solicitudes")}
                 />
 
                 <Text
@@ -484,7 +505,94 @@ export default function AccountDetailsScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                {/* Encabezado con contador accesible de 30 servicios */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.backgroundElement, 
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: colors.backgroundSelected || "#334155",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    padding: 16,
+                    marginTop: 12, 
+                    marginBottom: 16, 
+                  }}
+                  onPress={() => router.push("/solicitudes" as any)}
+                  activeOpacity={0.85}
+                >
+                
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      backgroundColor: "rgba(255, 183, 77, 0.15)", 
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginRight: 12,
+                    }}
+                  >
+                    <Ionicons
+                      name="document-text-outline"
+                      size={22}
+                      color="#FFB74D"
+                    />
+                  </View>
+
+                  {/* Títulos descriptivos */}
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: colors.text,
+                        fontSize: 16,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Solicitudes de Trabajo
+                    </Text>
+                    <Text
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                        marginTop: 2,
+                      }}
+                    >
+                      Gestiona propuestas y clientes
+                    </Text>
+                  </View>
+
+                  {/* contador dinamico */}
+                  <View
+                    style={{
+                      backgroundColor: "rgba(251, 191, 36, 0.15)",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 20,
+                      borderWidth: 1,
+                      borderColor: "rgba(251, 191, 36, 0.4)",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Ionicons
+                      name="notifications-outline"
+                      size={13}
+                      color="#FBBF24"
+                    />
+                    <Text
+                      style={{
+                        color: "#FBBF24",
+                        fontSize: 12,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {solicitudesCount}{" "}
+                      {solicitudesCount === 1 ? "nueva" : "nuevas"}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
                 <View style={styles.servicesHeaderRow}>
                   <Text
                     style={[
@@ -503,8 +611,8 @@ export default function AccountDetailsScreen() {
                           activeServicesCount >= MAX_ACTIVE_SERVICES
                             ? "rgba(239, 68, 68, 0.12)"
                             : isDark
-                            ? "rgba(255, 183, 77, 0.15)"
-                            : "rgba(255, 140, 0, 0.1)",
+                              ? "rgba(255, 183, 77, 0.15)"
+                              : "rgba(255, 140, 0, 0.1)",
                         borderColor:
                           activeServicesCount >= MAX_ACTIVE_SERVICES
                             ? "#EF4444"
@@ -570,7 +678,8 @@ export default function AccountDetailsScreen() {
                         { color: colors.textSecondary },
                       ]}
                     >
-                      Publica tus tarifas y tiempos para que los clientes te contraten directamente sin consultas previas.
+                      Publica tus tarifas y tiempos para que los clientes te
+                      contraten directamente sin consultas previas.
                     </Text>
                   </View>
                 )}
@@ -639,7 +748,10 @@ export default function AccountDetailsScreen() {
             if (Platform.OS === "web") {
               window.alert(err.message || "No se pudo eliminar el servicio.");
             } else {
-              Alert.alert("Error", err.message || "No se pudo eliminar el servicio.");
+              Alert.alert(
+                "Error",
+                err.message || "No se pudo eliminar el servicio.",
+              );
             }
           } finally {
             setIsDeletingService(false);

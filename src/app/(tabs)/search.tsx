@@ -1,5 +1,7 @@
 import ProfilePreviewModal from "@/components/ProfilePreviewModal";
 import { ContactModal } from "@/components/chat/ContactModal";
+import { SolicitudModal } from "@/components/solicitudes/solicitudModal";
+import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/use-theme";
 import { useLocation } from "@/hooks/useLocation";
 import { ServicioPublicadoItem } from "@/types/service";
@@ -8,7 +10,6 @@ import { COVERAGE_MESSAGE, isInCoverageZone } from "@/utils/geoZone";
 import { getPublicServicesByProfessionalId } from "@/utils/servicesStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useAuth } from "@/context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -74,6 +75,7 @@ export default function BusquedaScreen() {
   const [precioMax, setPrecioMax] = useState("");
   const [sortByPriceAsc, setSortByPriceAsc] = useState(false);
   const [radioKm, setRadioKm] = useState<number>(RADIO_POR_DEFECTO);
+  const [isSolicitudModalVisible, setIsSolicitudModalVisible] = useState(false);
 
   const [selectedPro, setSelectedPro] = useState<Profesional | null>(null);
   const [selectedProServices, setSelectedProServices] = useState<
@@ -194,88 +196,119 @@ export default function BusquedaScreen() {
   const siguienteRadio = RADIOS_KM.find((r) => r > radioKm);
   const sinResultadosEnRadio =
     profesionales.length > 0 && profesionalesVisibles.length === 0;
+const renderProfesional = ({ item }: { item: Profesional }) => (
+  <TouchableOpacity
+    activeOpacity={0.8}
+    onPress={() => handleSelectProfesional(item)}
+    style={[
+      styles.card,
+      {
+        backgroundColor: colors.backgroundElement,
+        borderColor: colors.backgroundSelected,
+      },
+    ]}
+  >
+    <View style={styles.cardHeader}>
+      <Image
+        source={{
+          uri:
+            item.usuario.fotoPerfil &&
+            !(
+              Platform.OS === "web" &&
+              item.usuario.fotoPerfil.startsWith("file://")
+            )
+              ? item.usuario.fotoPerfil
+              : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  `${item.usuario.nombre} ${item.usuario.apellido}`,
+                )}`,
+        }}
+        style={styles.avatar}
+      />
+      <View style={styles.cardInfo}>
+        <Text style={[styles.name, { color: colors.text }]}>
+          {item.usuario.nombre} {item.usuario.apellido}
+        </Text>
+        <Text style={[styles.profesion, { color: colors.primary }]}>
+          {item.profesiones.map((p) => p.nombre).join(", ")}
+        </Text>
+        <View style={styles.metaRow}>
+          {item.usuario.calificacionPromedio !== undefined && (
+            <View style={styles.rating}>
+              <Ionicons name="star" size={14} color="#FBBF24" />
+              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                {item.usuario.calificacionPromedio.toFixed(1)}
+              </Text>
+            </View>
+          )}
+          {item.distanciaKm !== undefined && (
+            <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+              • {item.distanciaKm.toFixed(1)} km
+            </Text>
+          )}
+        </View>
+      </View>
+    </View>
 
-  const renderProfesional = ({ item }: { item: Profesional }) => (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => handleSelectProfesional(item)}
+    {/* CONTENEDOR INFERIOR: Precio y botones alineados sin texto suelto */}
+    <View
       style={[
-        styles.card,
+        styles.cardFooterRow,
         {
-          backgroundColor: colors.backgroundElement,
-          borderColor: colors.backgroundSelected,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
         },
       ]}
     >
-      <View style={styles.cardHeader}>
-        <Image
-          source={{
-            uri:
-              item.usuario.fotoPerfil &&
-                !(
-                  Platform.OS === "web" &&
-                  item.usuario.fotoPerfil.startsWith("file://")
-                )
-                ? item.usuario.fotoPerfil
-                : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  `${item.usuario.nombre} ${item.usuario.apellido}`,
-                )}`,
-          }}
-          style={styles.avatar}
-        />
-        <View style={styles.cardInfo}>
-          <Text style={[styles.name, { color: colors.text }]}>
-            {item.usuario.nombre} {item.usuario.apellido}
-          </Text>
-          <Text style={[styles.profesion, { color: colors.primary }]}>
-            {item.profesiones.map((p) => p.nombre).join(", ")}
-          </Text>
-          <View style={styles.metaRow}>
-            {item.usuario.calificacionPromedio !== undefined && (
-              <View style={styles.rating}>
-                <Ionicons name="star" size={14} color="#FBBF24" />
-                <Text
-                  style={[styles.metaText, { color: colors.textSecondary }]}
-                >
-                  {item.usuario.calificacionPromedio.toFixed(1)}
-                </Text>
-              </View>
-            )}
-            {item.distanciaKm !== undefined && (
-              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                • {item.distanciaKm.toFixed(1)} km
-              </Text>
-            )}
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.cardFooterRow}>
+      {/* Bloque de Tarifa a la izquierda */}
+      <View>
         {item.tarifaBase !== undefined ? (
-          <Text style={[styles.tarifa, { color: colors.text }]}>
+          <Text
+            style={[
+              styles.tarifa,
+              { color: colors.text, fontSize: 14, fontWeight: "bold" },
+            ]}
+          >
             ${item.tarifaBase}/hora
           </Text>
         ) : (
-          <Text style={[styles.tarifaConsultar, { color: colors.textSecondary }]}>
-            Tarifa a convenir
+          <Text
+            style={[
+              styles.tarifaConsultar,
+              { color: colors.textSecondary, fontSize: 12 },
+            ]}
+          >
+            A convenir
           </Text>
         )}
+      </View>
 
-        {item.usuario._id === usuario?.id || item._id === usuario?.id ? (
-          <View style={styles.cardSelfBadge}>
-            <Ionicons
-              name="person-circle-outline"
-              size={15}
-              color={colors.textSecondary}
-              style={{ marginRight: 4 }}
-            />
-            <Text style={[styles.cardSelfBadgeText, { color: colors.textSecondary }]}>
-              Tu perfil
-            </Text>
-          </View>
-        ) : (
+      {item.usuario._id === usuario?.id || item._id === usuario?.id ? (
+        <View style={styles.cardSelfBadge}>
+          <Ionicons
+            name="person-circle-outline"
+            size={15}
+            color={colors.textSecondary}
+            style={{ marginRight: 4 }}
+          />
+          <Text
+            style={[styles.cardSelfBadgeText, { color: colors.textSecondary }]}
+          >
+            Tu perfil
+          </Text>
+        </View>
+      ) : (
+        <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+          {/* Botón Contactar */} 
           <TouchableOpacity
-            style={styles.cardContactBtn}
+            style={[
+              styles.cardContactBtn,
+              {
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+                minWidth: 85,
+              },
+            ]}
             onPress={(e: any) => {
               e.stopPropagation?.();
               setContactPro(item);
@@ -284,16 +317,59 @@ export default function BusquedaScreen() {
           >
             <Ionicons
               name="chatbubble-ellipses"
-              size={14}
+              size={13}
               color="#FFFFFF"
-              style={{ marginRight: 6 }}
+              style={{ marginRight: 3 }}
             />
-            <Text style={styles.cardContactBtnText}>Contactar</Text>
+            <Text style={[styles.cardContactBtnText, { fontSize: 12 }]}>
+              Contactar
+            </Text>
           </TouchableOpacity>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+
+          {/* Botón Solicitar*/}
+          <TouchableOpacity
+            style={[
+              styles.cardContactBtn,
+              {
+                backgroundColor: "#FFB74D",
+                borderWidth: 0,
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+                minWidth: 85,
+              },
+            ]}
+            onPress={(e: any) => {
+              e.stopPropagation?.();
+
+              setSelectedPro(item);
+
+              getPublicServicesByProfessionalId(item._id).then((srvs) => {
+                setSelectedProServices(srvs);
+                setIsSolicitudModalVisible(true);
+              });
+            }}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={13}
+              color="#121826"
+              style={{ marginRight: 3 }}
+            />
+            <Text
+              style={[
+                styles.cardContactBtnText,
+                { color: "#121826", fontWeight: "bold", fontSize: 12 },
+              ]}
+            >
+              Solicitar
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  </TouchableOpacity>
+);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -821,13 +897,15 @@ export default function BusquedaScreen() {
         <ProfilePreviewModal
           visible={showProModal}
           onClose={() => setShowProModal(false)}
+          profesionalId={selectedPro._id}
           onContact={
-            selectedPro.usuario._id === usuario?.id || selectedPro._id === usuario?.id
+            selectedPro.usuario._id === usuario?.id ||
+            selectedPro._id === usuario?.id
               ? undefined
               : () => {
-                setShowProModal(false);
-                setContactPro(selectedPro);
-              }
+                  setShowProModal(false);
+                  setContactPro(selectedPro);
+                }
           }
           nombre={selectedPro.usuario.nombre}
           apellido={selectedPro.usuario.apellido}
@@ -856,6 +934,70 @@ export default function BusquedaScreen() {
           }}
         />
       )}
+
+      <SolicitudModal
+        visible={isSolicitudModalVisible}
+        onClose={() => setIsSolicitudModalVisible(false)}
+        onSubmit={async (data) => {
+          try {
+            // 1. Validamos usando _id (que es como TypeScript conoce al profesional en el frontend)
+            if (!selectedPro || !selectedPro._id) {
+              Alert.alert("Error", "No hay un profesional seleccionado.");
+              return;
+            }
+
+            // 2. Intentamos agarrar el ID del servicio real.
+            let servicioId =
+              selectedProServices.length > 0 ? selectedProServices[0].id : null;
+
+            if (!servicioId) {
+              console.warn(
+                "⚠️ Profesional sin servicios. Usando ID de prueba...",
+              );
+              servicioId = "servicio-de-prueba-123";
+            }
+
+            // 3. Armamos el paquete usando selectedPro._id para complacer a TypeScript
+            const payload = {
+              profesionalId: selectedPro._id, // Usamos _id aquí porque así está tipado el frontend
+              servicioId: servicioId,
+              descripcion: data.descripcion || "Sin descripción",
+              fechaTentativa: data.fecha,
+              franjaHoraria: data.franjaHoraria || "A coordinar",
+            };
+
+            console.log(
+              "🚀 Enviando petición al backend con payload:",
+              payload,
+            );
+
+            // 4. Enviamos la petición real a tu base de datos
+            const response = await apiClient("/api/solicitudes", {
+              method: "POST",
+              body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+              console.log(
+                "✅ ¡Solicitud guardada en la base de datos exitosamente!",
+              );
+              Alert.alert("Éxito", "La solicitud se ha enviado correctamente.");
+              setIsSolicitudModalVisible(false);
+            } else {
+              const err = await response.json();
+              console.error("❌ Error del backend al guardar:", err);
+              Alert.alert(
+                "Error Backend",
+                err.error || "Fallo en la base de datos.",
+              );
+            }
+          } catch (error) {
+            console.error("❌ Error de conexión:", error);
+            Alert.alert("Error de Red", "No se pudo conectar con el servidor.");
+          }
+        }}
+        professionalName={selectedPro?.usuario?.nombre || "Profesional"}
+      />
     </View>
   );
 }
