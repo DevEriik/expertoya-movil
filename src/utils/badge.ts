@@ -1,4 +1,4 @@
-import * as Notifications from "expo-notifications";
+import * as Notifications from "@/utils/safeNotifications";
 import { apiClient } from "./api";
 
 export async function syncBadgeCount(): Promise<void> {

@@ -1731,6 +1731,8 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: "92%",
     maxWidth: 600,
+    flex: 1,
+    minHeight: 420,
     maxHeight: "92%",
     borderRadius: 24,
     borderWidth: 1.2,
@@ -1878,6 +1880,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flex: 1,
+    width: "100%",
   },
   scrollInner: {
     padding: 20,

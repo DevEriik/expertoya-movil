@@ -1,5 +1,5 @@
 import Constants from "expo-constants";
-import * as Notifications from "expo-notifications";
+import * as Notifications from "@/utils/safeNotifications";
 import { Platform } from "react-native";
 import { apiClient } from "./api";
 import {
@@ -23,6 +23,11 @@ function getPlataforma(): string {
 async function doRegister(force: boolean): Promise<string | null> {
   if (Platform.OS === "web") return null;
 
+  // En Expo Go, las notificaciones remotas no están disponibles por diseño de Expo SDK 52+
+  if (Constants.appOwnership === "expo") {
+    return null;
+  }
+
   await setupNotificationChannels();
 
   const permission = await getNotificationPermissionInfo();
@@ -30,11 +35,25 @@ async function doRegister(force: boolean): Promise<string | null> {
     return null;
   }
 
-  const expoToken = (
-    await Notifications.getExpoPushTokenAsync(
+  let expoToken: string | null = null;
+  try {
+    const res = await Notifications.getExpoPushTokenAsync(
       PROJECT_ID ? { projectId: PROJECT_ID } : undefined,
-    )
-  ).data;
+    );
+    expoToken = res?.data || null;
+  } catch (error) {
+    if (__DEV__) {
+      console.warn(
+        "Aviso: Push notifications no disponibles en el entorno actual (Expo Go). Usa una build de desarrollo para probar notificaciones remotas.",
+        error,
+      );
+    }
+    return null;
+  }
+
+  if (!expoToken) {
+    return null;
+  }
 
   if (!force && expoToken === lastRegisteredToken) {
     return expoToken;

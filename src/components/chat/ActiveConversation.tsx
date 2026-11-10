@@ -154,6 +154,7 @@ export const ActiveConversation: React.FC<Props> = ({
     mensajes: socketMensajes,
     cargando: cargandoSocket,
     bloqueado: socketBloqueado,
+    bloqueoInfo,
     estadoSolicitud,
     subiendoFoto,
     otroUsuarioEscribiendo,
@@ -163,6 +164,7 @@ export const ActiveConversation: React.FC<Props> = ({
     seleccionarYSubirFoto,
     subirNotaAudio,
     responderPropuesta,
+    recargarHistorial,
     llamadaEntrante,
     llamadaSaliente,
     salaUrlActiva,
@@ -176,6 +178,93 @@ export const ActiveConversation: React.FC<Props> = ({
     userId: currentUserId,
     token,
   });
+
+  // Estados para Menú de Seguridad y Modales de Bloqueo / Denuncia en Mobile
+  const [mostrarMenuOpciones, setMostrarMenuOpciones] = useState(false);
+  const [mostrarModalBloqueo, setMostrarModalBloqueo] = useState(false);
+  const [motivoBloqueo, setMotivoBloqueo] = useState('Trato inadecuado o irrespetuoso');
+  const [detalleBloqueo, setDetalleBloqueo] = useState('');
+  const [bloqueando, setBloqueando] = useState(false);
+
+  const [mostrarModalDenuncia, setMostrarModalDenuncia] = useState(false);
+  const [tipoMotivoDenuncia, setTipoMotivoDenuncia] = useState('PAGO_FUERA_PLATAFORMA');
+  const [detalleDenuncia, setDetalleDenuncia] = useState('');
+  const [bloquearAlDenunciar, setBloquearAlDenunciar] = useState(true);
+  const [denunciando, setDenunciando] = useState(false);
+
+  const handleBloquearUsuario = async () => {
+    if (!motivoBloqueo.trim()) {
+      Alert.alert('Campo requerido', 'Por favor selecciona un motivo para el bloqueo.');
+      return;
+    }
+    setBloqueando(true);
+    try {
+      const motivoFinal = detalleBloqueo.trim()
+        ? `${motivoBloqueo}: ${detalleBloqueo.trim()}`
+        : motivoBloqueo;
+
+      const res = await apiClient(`/api/chat/${chat.id}/bloquear`, {
+        method: 'POST',
+        body: JSON.stringify({ motivo: motivoFinal, denunciar: false }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Error al procesar el bloqueo');
+      }
+
+      setMostrarModalBloqueo(false);
+      setDetalleBloqueo('');
+      Alert.alert(
+        'Usuario Bloqueado',
+        'Se ha bloqueado la comunicación y videollamadas con este usuario. La solicitud ha sido cerrada.'
+      );
+      recargarHistorial();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'No se pudo completar el bloqueo');
+    } finally {
+      setBloqueando(false);
+    }
+  };
+
+  const handleDenunciarUsuario = async () => {
+    if (!detalleDenuncia.trim()) {
+      Alert.alert('Campo requerido', 'Por favor describe los detalles de la denuncia.');
+      return;
+    }
+    setDenunciando(true);
+    try {
+      const res = await apiClient(`/api/reportes/crear`, {
+        method: 'POST',
+        body: JSON.stringify({
+          denunciado_id: otherPerson.id,
+          solicitud_id: chat.id,
+          tipo_motivo: tipoMotivoDenuncia,
+          descripcion: detalleDenuncia.trim(),
+          bloquear: bloquearAlDenunciar,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Error al registrar la denuncia');
+      }
+
+      setMostrarModalDenuncia(false);
+      setDetalleDenuncia('');
+      Alert.alert(
+        'Denuncia Enviada',
+        'Tu denuncia fue remitida a la bandeja de auditoría del Administrador para su resolución disciplinaria.'
+      );
+      if (bloquearAlDenunciar) {
+        recargarHistorial();
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'No se pudo enviar la denuncia');
+    } finally {
+      setDenunciando(false);
+    }
+  };
 
   useEffect(() => {
     if (salaUrlActiva && chat.id) {
@@ -336,6 +425,7 @@ export const ActiveConversation: React.FC<Props> = ({
     socketBloqueado ||
     estadoSolicitud === 'FINALIZADO' ||
     estadoSolicitud === 'DISPUTA' ||
+    estadoSolicitud === 'BLOQUEADO' ||
     chat.status === 'COMPLETADO';
 
   const [variacion, setVariacion] = useState(0);
@@ -658,29 +748,80 @@ export const ActiveConversation: React.FC<Props> = ({
           </View>
         </View>
 
-        {!estaBloqueado && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {!estaBloqueado && (
+            <TouchableOpacity
+              style={styles.videoButton}
+              onPress={iniciarVideollamada}
+              accessible={true}
+              accessibilityLabel="Iniciar videollamada de diagnóstico visual"
+              accessibilityRole="button"
+            >
+              <Ionicons name="videocam-outline" size={26} color="#00BFA5" />
+            </TouchableOpacity>
+          )}
+
+          {/* Menú de Seguridad y Opciones ⋮ */}
           <TouchableOpacity
-            style={styles.videoButton}
-            onPress={iniciarVideollamada}
+            style={styles.menuOpcionesBtn}
+            onPress={() => setMostrarMenuOpciones(true)}
             accessible={true}
-            accessibilityLabel="Iniciar videollamada de diagnóstico visual"
+            accessibilityLabel="Opciones de seguridad y reporte"
             accessibilityRole="button"
           >
-            <Ionicons name="videocam-outline" size={26} color="#00BFA5" />
+            <Ionicons
+              name="ellipsis-vertical"
+              size={22}
+              color={isDark ? '#FDFCF4' : '#283593'}
+            />
           </TouchableOpacity>
-        )}
+        </View>
       </View>
 
       {estaBloqueado && (
-        <View style={styles.blockedBanner}>
-          <Ionicons name="lock-closed" size={18} color="#D97706" />
-          <Text style={styles.blockedBannerText}>
-            Chat cerrado. La solicitud se encuentra en estado{' '}
-            <Text style={{ fontWeight: '700' }}>
-              {estadoSolicitud || chat.status}
-            </Text>
-            . No se pueden enviar más mensajes.
+        <View
+          style={[
+            styles.blockedBanner,
+            (estadoSolicitud === 'BLOQUEADO' || socketBloqueado) && {
+              backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2',
+              borderBottomColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#FCA5A5',
+            },
+          ]}
+        >
+          <Ionicons
+            name={estadoSolicitud === 'BLOQUEADO' || socketBloqueado ? 'ban' : 'lock-closed'}
+            size={18}
+            color="#EF4444"
+          />
+          <Text
+            style={[
+              styles.blockedBannerText,
+              (estadoSolicitud === 'BLOQUEADO' || socketBloqueado) && {
+                color: isDark ? '#FCA5A5' : '#991B1B',
+              },
+            ]}
+          >
+            {estadoSolicitud === 'BLOQUEADO' || socketBloqueado
+              ? bloqueoInfo?.es_bloqueador
+                ? 'Has bloqueado a este usuario. La comunicación y videollamadas han sido deshabilitadas.'
+                : 'Esta conversación ha sido bloqueada. La comunicación y videollamadas han sido deshabilitadas.'
+              : `Chat cerrado. La solicitud se encuentra en estado ${estadoSolicitud || chat.status}.`}
           </Text>
+          <TouchableOpacity
+            onPress={() => setMostrarModalDenuncia(true)}
+            style={{ paddingHorizontal: 6, paddingVertical: 2 }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '700',
+                color: '#EF4444',
+                textDecorationLine: 'underline',
+              }}
+            >
+              Reportar
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -1922,6 +2063,521 @@ export const ActiveConversation: React.FC<Props> = ({
         targetUser={otherPerson}
         onCancel={cancelarLlamadaSaliente}
       />
+
+      {/* Menú de Seguridad y Opciones */}
+      <Modal
+        visible={mostrarMenuOpciones}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setMostrarMenuOpciones(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setMostrarMenuOpciones(false)}
+        >
+          <View
+            style={[
+              styles.actionSheetContainer,
+              { backgroundColor: isDark ? '#1F2937' : '#FFFFFF' },
+            ]}
+          >
+            <View style={styles.actionSheetHandle} />
+            <Text
+              style={[
+                styles.actionSheetTitle,
+                { color: isDark ? '#FDFCF4' : '#1E293B' },
+              ]}
+            >
+              Seguridad y Auditoría
+            </Text>
+
+            <TouchableOpacity
+              style={styles.actionSheetOption}
+              onPress={() => {
+                setMostrarMenuOpciones(false);
+                setMostrarModalDenuncia(true);
+              }}
+            >
+              <View
+                style={[
+                  styles.actionSheetIconCircle,
+                  { backgroundColor: 'rgba(245, 158, 11, 0.15)' },
+                ]}
+              >
+                <Ionicons name="shield-checkmark" size={18} color="#D97706" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    styles.actionSheetOptionText,
+                    { color: isDark ? '#FDFCF4' : '#1E293B' },
+                  ]}
+                >
+                  Denunciar usuario
+                </Text>
+                <Text style={styles.actionSheetOptionSub}>
+                  Radicar reporte formal ante el Administrador
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {!estaBloqueado && (
+              <TouchableOpacity
+                style={styles.actionSheetOption}
+                onPress={() => {
+                  setMostrarMenuOpciones(false);
+                  setMostrarModalBloqueo(true);
+                }}
+              >
+                <View
+                  style={[
+                    styles.actionSheetIconCircle,
+                    { backgroundColor: 'rgba(239, 68, 68, 0.15)' },
+                  ]}
+                >
+                  <Ionicons name="ban" size={18} color="#EF4444" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.actionSheetOptionText, { color: '#EF4444' }]}>
+                    Bloquear a este usuario
+                  </Text>
+                  <Text style={styles.actionSheetOptionSub}>
+                    Interrumpir mensajes y videollamadas
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.actionSheetCancelBtn,
+                { backgroundColor: isDark ? '#111827' : '#F1F5F9' },
+              ]}
+              onPress={() => setMostrarMenuOpciones(false)}
+            >
+              <Text
+                style={[
+                  styles.actionSheetCancelText,
+                  { color: isDark ? '#D1D5DB' : '#64748B' },
+                ]}
+              >
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Modal de Bloqueo de Usuario */}
+      <Modal
+        visible={mostrarModalBloqueo}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setMostrarModalBloqueo(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View
+            style={[
+              styles.securityModalCard,
+              { backgroundColor: isDark ? '#121826' : '#FFFFFF' },
+            ]}
+          >
+            <View style={styles.securityModalCardHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={styles.iconCircleDanger}>
+                  <Ionicons name="ban" size={18} color="#EF4444" />
+                </View>
+                <View>
+                  <Text
+                    style={[
+                      styles.securityModalCardTitle,
+                      { color: isDark ? '#FDFCF4' : '#1E293B' },
+                    ]}
+                  >
+                    Bloquear Usuario
+                  </Text>
+                  <Text style={styles.securityModalCardSubtitle}>
+                    {otherPerson.name}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setMostrarModalBloqueo(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name="close"
+                  size={22}
+                  color={isDark ? '#9CA3AF' : '#64748B'}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              <Text
+                style={[
+                  styles.modalSectionLabel,
+                  { color: isDark ? '#E5E7EB' : '#374151' },
+                ]}
+              >
+                Motivo del bloqueo (obligatorio):
+              </Text>
+
+              {[
+                'Trato inadecuado o irrespetuoso',
+                'Insistencia de contacto o cobro por fuera',
+                'Spam o mensajes no deseados',
+                'Desacuerdo grave o incumplimiento',
+                'Otro motivo',
+              ].map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  style={[
+                    styles.radioOptionPill,
+                    {
+                      backgroundColor:
+                        motivoBloqueo === m
+                          ? isDark
+                            ? 'rgba(239, 68, 68, 0.15)'
+                            : '#FEE2E2'
+                          : isDark
+                            ? '#1F2937'
+                            : '#F8FAFC',
+                      borderColor:
+                        motivoBloqueo === m ? '#EF4444' : isDark ? '#374151' : '#E2E8F0',
+                    },
+                  ]}
+                  onPress={() => setMotivoBloqueo(m)}
+                >
+                  <Ionicons
+                    name={motivoBloqueo === m ? 'radio-button-on' : 'radio-button-off'}
+                    size={16}
+                    color={motivoBloqueo === m ? '#EF4444' : '#94A3B8'}
+                  />
+                  <Text
+                    style={[
+                      styles.radioOptionText,
+                      {
+                        color:
+                          motivoBloqueo === m
+                            ? '#EF4444'
+                            : isDark
+                              ? '#D1D5DB'
+                              : '#475569',
+                        fontWeight: motivoBloqueo === m ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    {m}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              <Text
+                style={[
+                  styles.modalSectionLabel,
+                  { color: isDark ? '#E5E7EB' : '#374151', marginTop: 12 },
+                ]}
+              >
+                Aclaración adicional (opcional):
+              </Text>
+              <TextInput
+                value={detalleBloqueo}
+                onChangeText={setDetalleBloqueo}
+                placeholder="Explica brevemente los hechos..."
+                placeholderTextColor="#94A3B8"
+                multiline={true}
+                numberOfLines={3}
+                style={[
+                  styles.modalTextarea,
+                  {
+                    backgroundColor: isDark ? '#1F2937' : '#F8FAFC',
+                    borderColor: isDark ? '#374151' : '#E2E8F0',
+                    color: isDark ? '#FDFCF4' : '#1E293B',
+                  },
+                ]}
+              />
+
+              <View style={styles.warningAlertBox}>
+                <Ionicons name="alert-circle" size={18} color="#D97706" />
+                <Text style={styles.warningAlertText}>
+                  Al confirmar, se cerrará de inmediato cualquier videollamada activa y no podrán volver a intercambiar mensajes.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActionButtonsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.modalSecondaryBtn,
+                  { borderColor: isDark ? '#374151' : '#CBD5E1' },
+                ]}
+                onPress={() => setMostrarModalBloqueo(false)}
+                disabled={bloqueando}
+              >
+                <Text
+                  style={[
+                    styles.modalSecondaryBtnText,
+                    { color: isDark ? '#D1D5DB' : '#64748B' },
+                  ]}
+                >
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalDangerBtn, bloqueando && { opacity: 0.6 }]}
+                onPress={handleBloquearUsuario}
+                disabled={bloqueando}
+              >
+                {bloqueando ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="ban" size={16} color="#FFFFFF" />
+                )}
+                <Text style={styles.modalDangerBtnText}>
+                  {bloqueando ? 'Bloqueando...' : 'Confirmar Bloqueo'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Modal de Denuncia de Usuario */}
+      <Modal
+        visible={mostrarModalDenuncia}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setMostrarModalDenuncia(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View
+            style={[
+              styles.securityModalCard,
+              { backgroundColor: isDark ? '#121826' : '#FFFFFF' },
+            ]}
+          >
+            <View style={styles.securityModalCardHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View
+                  style={[
+                    styles.iconCircleDanger,
+                    { backgroundColor: 'rgba(245, 158, 11, 0.15)' },
+                  ]}
+                >
+                  <Ionicons name="shield-checkmark" size={18} color="#D97706" />
+                </View>
+                <View>
+                  <Text
+                    style={[
+                      styles.securityModalCardTitle,
+                      { color: isDark ? '#FDFCF4' : '#1E293B' },
+                    ]}
+                  >
+                    Denunciar Usuario
+                  </Text>
+                  <Text style={styles.securityModalCardSubtitle}>
+                    Auditoría para {otherPerson.name}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setMostrarModalDenuncia(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name="close"
+                  size={22}
+                  color={isDark ? '#9CA3AF' : '#64748B'}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              <Text
+                style={[
+                  styles.modalSectionLabel,
+                  { color: isDark ? '#E5E7EB' : '#374151' },
+                ]}
+              >
+                Falta tipificada cometida:
+              </Text>
+
+              {[
+                {
+                  tipo: 'PAGO_FUERA_PLATAFORMA',
+                  titulo: '💸 Cobro/pago por fuera de plataforma',
+                  sub: 'Evasión de Garantía Escrow',
+                },
+                {
+                  tipo: 'ACOSO_O_LENGUAJE_OFENSIVO',
+                  titulo: '🤬 Lenguaje ofensivo o acoso',
+                  sub: 'Insultos o conducta inapropiada',
+                },
+                {
+                  tipo: 'INCUMPLIMIENTO_SERVICIO',
+                  titulo: '🚫 Incumplimiento del servicio',
+                  sub: 'Ausencia o abandono del trabajo',
+                },
+                {
+                  tipo: 'SUPLANTACION_O_FRAUDE',
+                  titulo: '🎭 Perfil falso o fraude',
+                  sub: 'Suplantación de identidad o engaño',
+                },
+                {
+                  tipo: 'OTRO',
+                  titulo: '⚠️ Otro motivo grave',
+                  sub: 'Infracción a las condiciones de uso',
+                },
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item.tipo}
+                  style={[
+                    styles.radioOptionPill,
+                    {
+                      backgroundColor:
+                        tipoMotivoDenuncia === item.tipo
+                          ? isDark
+                            ? 'rgba(245, 158, 11, 0.15)'
+                            : '#FEF3C7'
+                          : isDark
+                            ? '#1F2937'
+                            : '#F8FAFC',
+                      borderColor:
+                        tipoMotivoDenuncia === item.tipo
+                          ? '#D97706'
+                          : isDark
+                            ? '#374151'
+                            : '#E2E8F0',
+                    },
+                  ]}
+                  onPress={() => setTipoMotivoDenuncia(item.tipo)}
+                >
+                  <Ionicons
+                    name={
+                      tipoMotivoDenuncia === item.tipo
+                        ? 'radio-button-on'
+                        : 'radio-button-off'
+                    }
+                    size={16}
+                    color={tipoMotivoDenuncia === item.tipo ? '#D97706' : '#94A3B8'}
+                  />
+                  <View style={{ flex: 1, marginLeft: 6 }}>
+                    <Text
+                      style={[
+                        styles.radioOptionText,
+                        {
+                          color:
+                            tipoMotivoDenuncia === item.tipo
+                              ? '#B45309'
+                              : isDark
+                                ? '#D1D5DB'
+                                : '#475569',
+                          fontWeight:
+                            tipoMotivoDenuncia === item.tipo ? '700' : '500',
+                        },
+                      ]}
+                    >
+                      {item.titulo}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#94A3B8' }}>{item.sub}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+              <Text
+                style={[
+                  styles.modalSectionLabel,
+                  { color: isDark ? '#E5E7EB' : '#374151', marginTop: 12 },
+                ]}
+              >
+                Descargo y detalles de los hechos *:
+              </Text>
+              <TextInput
+                value={detalleDenuncia}
+                onChangeText={setDetalleDenuncia}
+                placeholder="Explica detalladamente la situación para la auditoría..."
+                placeholderTextColor="#94A3B8"
+                multiline={true}
+                numberOfLines={3}
+                style={[
+                  styles.modalTextarea,
+                  {
+                    backgroundColor: isDark ? '#1F2937' : '#F8FAFC',
+                    borderColor: isDark ? '#374151' : '#E2E8F0',
+                    color: isDark ? '#FDFCF4' : '#1E293B',
+                  },
+                ]}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.checkboxRow,
+                  { backgroundColor: isDark ? '#1F2937' : '#F1F5F9' },
+                ]}
+                onPress={() => setBloquearAlDenunciar((prev) => !prev)}
+              >
+                <Ionicons
+                  name={bloquearAlDenunciar ? 'checkbox' : 'square-outline'}
+                  size={20}
+                  color={bloquearAlDenunciar ? '#EF4444' : '#94A3B8'}
+                />
+                <Text
+                  style={[
+                    styles.checkboxText,
+                    { color: isDark ? '#FDFCF4' : '#1E293B' },
+                  ]}
+                >
+                  Bloquear también a este usuario para no recibir más mensajes ni llamadas
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <View style={styles.modalActionButtonsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.modalSecondaryBtn,
+                  { borderColor: isDark ? '#374151' : '#CBD5E1' },
+                ]}
+                onPress={() => setMostrarModalDenuncia(false)}
+                disabled={denunciando}
+              >
+                <Text
+                  style={[
+                    styles.modalSecondaryBtnText,
+                    { color: isDark ? '#D1D5DB' : '#64748B' },
+                  ]}
+                >
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalDangerBtn, denunciando && { opacity: 0.6 }]}
+                onPress={handleDenunciarUsuario}
+                disabled={denunciando}
+              >
+                {denunciando ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" />
+                )}
+                <Text style={styles.modalDangerBtnText}>
+                  {denunciando ? 'Enviando...' : 'Enviar Denuncia'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -2848,6 +3504,207 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   securityModalCloseBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  menuOpcionesBtn: {
+    padding: 6,
+    borderRadius: 8,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  actionSheetContainer: {
+    width: '100%',
+    maxWidth: 440,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    marginTop: 'auto',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  actionSheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#94A3B8',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  actionSheetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  actionSheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    gap: 12,
+  },
+  actionSheetIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionSheetOptionText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  actionSheetOptionSub: {
+    fontSize: 11.5,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  actionSheetCancelBtn: {
+    marginTop: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionSheetCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  securityModalCard: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: 20,
+    padding: 20,
+    maxHeight: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  securityModalCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  iconCircleDanger: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  securityModalCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  securityModalCardSubtitle: {
+    fontSize: 11.5,
+    color: '#94A3B8',
+  },
+  modalSectionLabel: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  radioOptionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginBottom: 8,
+    gap: 8,
+  },
+  radioOptionText: {
+    fontSize: 13,
+  },
+  modalTextarea: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    fontSize: 13,
+    textAlignVertical: 'top',
+    minHeight: 70,
+  },
+  warningAlertBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 12,
+    marginBottom: 4,
+    gap: 8,
+  },
+  warningAlertText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: '#D97706',
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 12,
+    marginBottom: 4,
+    gap: 10,
+  },
+  checkboxText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  modalActionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 16,
+  },
+  modalSecondaryBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSecondaryBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modalDangerBtn: {
+    flex: 1.5,
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  modalDangerBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',

@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert, Platform } from 'react-native';
 import { apiClient, API_URL } from '@/utils/api';
+import { createFormDataFile } from '@/utils/fileUpload';
 import { MensajeChatModel, VideoCallInvitation } from '@/types/chat';
 
 interface UseChatSocketParams {
@@ -19,6 +20,12 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
   const [mensajes, setMensajes] = useState<MensajeChatModel[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
   const [bloqueado, setBloqueado] = useState<boolean>(false);
+  const [bloqueoInfo, setBloqueoInfo] = useState<{
+    id?: string;
+    motivo?: string;
+    es_bloqueador?: boolean;
+    fecha_bloqueo?: string;
+  } | null>(null);
   const [estadoSolicitud, setEstadoSolicitud] = useState<string>('');
   const [subiendoFoto, setSubiendoFoto] = useState<boolean>(false);
   const [otroUsuarioEscribiendo, setOtroUsuarioEscribiendo] = useState<boolean>(false);
@@ -57,6 +64,9 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
 
       setMensajes(formateados);
       setBloqueado(Boolean(estaBloqueado));
+      if (data.bloqueo_info) {
+        setBloqueoInfo(data.bloqueo_info);
+      }
       setEstadoSolicitud(estado_solicitud || '');
     } catch (err: any) {
       console.error('Error al cargar historial del chat:', err.message);
@@ -90,9 +100,12 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
       socket.emit('join_solicitud', { solicitud_id: solicitudId });
     });
 
-    socket.on('chat_unido', (data: { solicitud_id: string; bloqueado: boolean; estado_solicitud: string }) => {
+    socket.on('chat_unido', (data: { solicitud_id: string; bloqueado: boolean; estado_solicitud: string; bloqueo?: any }) => {
       if (data.bloqueado) {
         setBloqueado(true);
+      }
+      if (data.bloqueo) {
+        setBloqueoInfo(data.bloqueo);
       }
       setEstadoSolicitud(data.estado_solicitud);
     });
@@ -192,9 +205,16 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
       }
     });
 
-    socket.on('chat_bloqueado', (data: { solicitud_id: string; motivo: string }) => {
+    socket.on('chat_bloqueado', (data: { solicitud_id: string; motivo: string; bloqueador_id?: string }) => {
       setBloqueado(true);
-      Alert.alert('Chat Cerrado', data.motivo);
+      setEstadoSolicitud('BLOQUEADO');
+      setBloqueoInfo({
+        motivo: data.motivo,
+        es_bloqueador: data.bloqueador_id === userId,
+      });
+      setLlamadaSaliente(false);
+      setLlamadaEntrante(null);
+      setSalaUrlActiva(null);
     });
 
     socket.on('propuesta_actualizada', (data: { mensaje_id: string; contenido: string; nuevo_estado: string }) => {
@@ -356,14 +376,11 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
 
       const filename = asset.uri.split('/').pop() || 'adjunto.jpg';
       const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      const mimeType = match ? `image/${match[1]}` : 'image/jpeg';
 
+      const filePart = await createFormDataFile(asset.uri, filename, mimeType);
       const formData = new FormData();
-      formData.append('foto', {
-        uri: asset.uri,
-        name: filename,
-        type,
-      } as any);
+      formData.append('foto', filePart, filename);
 
       const response = await apiClient(`/api/chat/${solicitudId}/adjunto`, {
         method: 'POST',
@@ -499,17 +516,12 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
         return;
       }
 
+      const filename = typeof audioUriOrBlob === 'string' ? audioUriOrBlob.split('/').pop() || 'audio-nota.m4a' : 'audio-nota.m4a';
+      const mimeType = Platform.OS === 'web' ? 'audio/webm' : 'audio/m4a';
+
+      const audioPart = await createFormDataFile(audioUriOrBlob, filename, mimeType);
       const formData = new FormData();
-      if (Platform.OS === 'web' && audioUriOrBlob instanceof Blob) {
-        formData.append('audio', audioUriOrBlob, 'nota-audio.webm');
-      } else {
-        const filename = typeof audioUriOrBlob === 'string' ? audioUriOrBlob.split('/').pop() || 'audio-nota.m4a' : 'audio-nota.m4a';
-        formData.append('audio', {
-          uri: typeof audioUriOrBlob === 'string' ? audioUriOrBlob : (audioUriOrBlob?.uri || ''),
-          name: filename,
-          type: 'audio/m4a',
-        } as any);
-      }
+      formData.append('audio', audioPart, filename);
 
       const response = await apiClient(`/api/chat/${solicitudId}/adjunto`, {
         method: 'POST',
@@ -628,6 +640,7 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
     mensajes,
     cargando,
     bloqueado,
+    bloqueoInfo,
     estadoSolicitud,
     subiendoFoto,
     otroUsuarioEscribiendo,

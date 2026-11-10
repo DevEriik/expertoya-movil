@@ -1,4 +1,4 @@
-import * as Notifications from "expo-notifications";
+import * as Notifications from "@/utils/safeNotifications";
 import { Linking, Platform } from "react-native";
 
 export const NOTIFICATION_CHANNELS = {
@@ -53,12 +53,14 @@ export function setupNotificationChannels(): Promise<void> {
         const channels = await Notifications.getNotificationChannelsAsync();
         console.log(
           "Canales de notificación:",
-          channels?.map((channel) => channel.id),
+          channels?.map((channel: any) => channel.id),
         );
       }
     })().catch((error) => {
       channelsReady = null;
-      throw error;
+      if (__DEV__) {
+        console.warn("Aviso: No se pudieron configurar los canales de notificación en este entorno:", error);
+      }
     });
   }
 

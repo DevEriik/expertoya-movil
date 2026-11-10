@@ -1,4 +1,4 @@
-import * as Notifications from "expo-notifications";
+import * as Notifications from "@/utils/safeNotifications";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { DeviceEventEmitter } from "react-native";
 import { apiClient } from "../utils/api";
@@ -94,13 +94,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       console.warn("No se pudo registrar el token push:", error);
     });
 
-    const subscription = Notifications.addPushTokenListener(() => {
-      registerPushToken({ force: true }).catch((error) => {
-        console.warn("No se pudo refrescar el token push:", error);
+    let subscription: Notifications.Subscription | null = null;
+    try {
+      subscription = Notifications.addPushTokenListener(() => {
+        registerPushToken({ force: true }).catch((error) => {
+          console.warn("No se pudo refrescar el token push:", error);
+        });
       });
-    });
+    } catch {}
 
-    return () => subscription.remove();
+    return () => subscription?.remove();
   }, [token]);
 
   const login = async (newToken: string, newUsuario: Usuario) => {
