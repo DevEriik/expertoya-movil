@@ -126,7 +126,6 @@ export default function SolicitudesProfesionalScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      
       <View
         style={[
           styles.headerBar,
@@ -152,11 +151,13 @@ export default function SolicitudesProfesionalScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      
       <View
         style={[
           styles.tabsContainer,
-          { backgroundColor: colors.backgroundElement },
+          {
+            backgroundColor: colors.backgroundElement,
+            borderBottomColor: colors.backgroundSelected || "#E2E8F0", // <-- AGREGADO
+          },
         ]}
       >
         {(["PENDIENTE", "ACEPTADO", "RECHAZADO"] as const).map((tab) => {
@@ -184,7 +185,11 @@ export default function SolicitudesProfesionalScreen() {
               <Text
                 style={[
                   styles.tabText,
-                  { color: isActive ? colors.primary : colors.textSecondary },
+                  {
+                    color: isActive
+                      ? colors.primary
+                      : colors.textSecondary || "#94A3B8",
+                  },
                 ]}
               >
                 {tab === "PENDIENTE"
@@ -199,7 +204,6 @@ export default function SolicitudesProfesionalScreen() {
         })}
       </View>
 
-      
       <FlatList
         data={solicitudesFiltradas}
         keyExtractor={(item) => item.id || item._id}
@@ -318,7 +322,12 @@ export default function SolicitudesProfesionalScreen() {
                 </Text>
               </View>
 
-              <Text style={[styles.descripcion, { color: colors.text }]}>
+              <Text
+                style={[
+                  styles.descripcion,
+                  { color: colors.text, backgroundColor: colors.background },
+                ]}
+              >
                 "{item.descripcion || "Sin descripción proporcionada."}"
               </Text>
 
@@ -386,8 +395,7 @@ const styles = StyleSheet.create({
   headerTitleText: { fontSize: 18, fontWeight: "bold" },
   tabsContainer: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    borderBottomWidth: 1,
+    justifyContent: "space-around", 
   },
   tabButton: {
     paddingVertical: 12,
@@ -422,7 +430,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: "italic",
     marginTop: 8,
-    backgroundColor: "#121826",
     padding: 10,
     borderRadius: 8,
   },

@@ -21,6 +21,7 @@ export interface Usuario {
   nombre: string;
   apellido: string;
   rol: UserRole;
+  telefono?: string | null;
   profesional?: Profesional | null;
 }
 
