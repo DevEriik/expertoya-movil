@@ -3,7 +3,6 @@ import { Ionicons } from "@expo/vector-icons";
 
 export type IconName = keyof typeof Ionicons.glyphMap;
 
-
 //  - Naranja marca #FF8C00 · Teal #00BFA5 · Índigo (texto) #283593 · Crema #FDFCF4
 //  - Dark: fondo #121826, superficies #1F2937, naranja suave #FFB74D, teal #33EFA5
 //  - Semánticos: Success #10B981/#34D399 · Warning #F59E0B/#FBBF24 · Danger #EF4444/#F87171
@@ -19,8 +18,8 @@ export const paleta = (isDark: boolean) => ({
   exito: isDark ? "#34D399" : "#10B981",
   aviso: isDark ? "#FBBF24" : "#F59E0B",
   peligro: isDark ? "#F87171" : "#EF4444",
-  
   sobreColor: isDark ? "#121826" : "#FFFFFF",
+  fondoInput: isDark ? "#121826" : "#F8FAFC", // Un gris muy sutil para destacar sobre el blanco
 });
 
 export const formatearFecha = (iso: string) => {

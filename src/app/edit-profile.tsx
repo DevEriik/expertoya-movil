@@ -25,9 +25,9 @@ import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ProfilePreviewModal from "@/components/ProfilePreviewModal";
-import { useTheme } from "@/hooks/use-theme";
 import { useAccessibility } from "@/context/AccessibilityContext";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/hooks/use-theme";
 import { apiClient } from "@/utils/api";
 import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
 
@@ -139,13 +139,55 @@ export const mapBackendOficiosToIds = (
 };
 
 const DIAS_SEMANA_DEFAULT = [
-  { dia_semana: 1, nombre: "Lunes", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
-  { dia_semana: 2, nombre: "Martes", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
-  { dia_semana: 3, nombre: "Miércoles", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
-  { dia_semana: 4, nombre: "Jueves", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
-  { dia_semana: 5, nombre: "Viernes", activo: false, hora_inicio: "08:00", hora_fin: "17:00" },
-  { dia_semana: 6, nombre: "Sábado", activo: false, hora_inicio: "09:00", hora_fin: "13:00" },
-  { dia_semana: 7, nombre: "Domingo", activo: false, hora_inicio: "09:00", hora_fin: "13:00" },
+  {
+    dia_semana: 1,
+    nombre: "Lunes",
+    activo: false,
+    hora_inicio: "08:00",
+    hora_fin: "17:00",
+  },
+  {
+    dia_semana: 2,
+    nombre: "Martes",
+    activo: false,
+    hora_inicio: "08:00",
+    hora_fin: "17:00",
+  },
+  {
+    dia_semana: 3,
+    nombre: "Miércoles",
+    activo: false,
+    hora_inicio: "08:00",
+    hora_fin: "17:00",
+  },
+  {
+    dia_semana: 4,
+    nombre: "Jueves",
+    activo: false,
+    hora_inicio: "08:00",
+    hora_fin: "17:00",
+  },
+  {
+    dia_semana: 5,
+    nombre: "Viernes",
+    activo: false,
+    hora_inicio: "08:00",
+    hora_fin: "17:00",
+  },
+  {
+    dia_semana: 6,
+    nombre: "Sábado",
+    activo: false,
+    hora_inicio: "09:00",
+    hora_fin: "13:00",
+  },
+  {
+    dia_semana: 7,
+    nombre: "Domingo",
+    activo: false,
+    hora_inicio: "09:00",
+    hora_fin: "13:00",
+  },
 ];
 
 const DEFAULT_AVATAR =
@@ -164,7 +206,8 @@ export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const colors = useTheme();
   const { isDarkMode: isDark } = useAccessibility();
-  const { usuario, login } = useAuth();
+
+  const { usuario, login, token} = useAuth();
 
   const admin = isAdmin(usuario?.rol);
   const showClientCTA = isCliente(usuario?.rol);
@@ -249,7 +292,8 @@ export default function EditProfileScreen() {
   const [showPreview, setShowPreview] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [oficiosList, setOficiosList] = useState<OficioItem[]>(OFICIOS_CATALOGO);
+  const [oficiosList, setOficiosList] =
+    useState<OficioItem[]>(OFICIOS_CATALOGO);
   const [selectedOficios, setSelectedOficios] = useState<number[]>([]);
   const [originalOficios, setOriginalOficios] = useState<number[]>([]);
   const [attachedDoc, setAttachedDoc] = useState<{
@@ -258,7 +302,9 @@ export default function EditProfileScreen() {
     mimeType: string;
     size?: number;
   } | null>(null);
-  const [existingMatriculaUrl, setExistingMatriculaUrl] = useState<string | null>(null);
+  const [existingMatriculaUrl, setExistingMatriculaUrl] = useState<
+    string | null
+  >(null);
   const [pendingOficiosIds, setPendingOficiosIds] = useState<number[]>([]);
 
   const newOficiosRequiringLicense = useMemo(() => {
@@ -384,7 +430,8 @@ export default function EditProfileScreen() {
               if (data.foto_perfil) {
                 const isExpired =
                   data.foto_perfil.startsWith("blob:") ||
-                  (Platform.OS === "web" && data.foto_perfil.startsWith("file://"));
+                  (Platform.OS === "web" &&
+                    data.foto_perfil.startsWith("file://"));
                 if (!isExpired) {
                   setAvatarUri(data.foto_perfil);
                 }
@@ -542,6 +589,26 @@ export default function EditProfileScreen() {
 
       let response: Response;
 
+      if (isEphemeralUri) {
+        const fotoData = new FormData();
+        fotoData.append("foto", {
+          uri: avatarUri,
+          name: "perfil.jpg",
+          type: "image/jpeg",
+        } as any);
+
+        const fotoResponse = await apiClient("/api/clientes/me/foto", {
+          method: "POST",
+          body: fotoData,
+        });
+
+        if (!fotoResponse.ok) {
+          console.warn(
+            "Error subiendo la foto, pero continuando con el perfil.",
+          );
+        }
+      }
+
       if (showProFields && attachedDoc) {
         const formData = new FormData();
         formData.append("nombre", nombre.trim());
@@ -564,7 +631,10 @@ export default function EditProfileScreen() {
             const fileName = attachedDoc.name || "matricula_profesional.pdf";
             formData.append("matricula_documento", blob, fileName);
           } catch (blobErr) {
-            console.error("Error al preparar blob de documento en web:", blobErr);
+            console.error(
+              "Error al preparar blob de documento en web:",
+              blobErr,
+            );
             (formData as any).append("matricula_documento", {
               uri: attachedDoc.uri,
               name: attachedDoc.name || "matricula_profesional.pdf",
@@ -592,7 +662,9 @@ export default function EditProfileScreen() {
           descripcion_perfil: bio.trim(),
           ubicacion_geografica: zonasCobertura.trim(),
           disponible,
-          ...(aniosExperiencia.trim() ? { experiencia: parseInt(aniosExperiencia.trim(), 10) } : {}),
+          ...(aniosExperiencia.trim()
+            ? { experiencia: parseInt(aniosExperiencia.trim(), 10) }
+            : {}),
         };
 
         if (showProFields) {
@@ -625,20 +697,27 @@ export default function EditProfileScreen() {
             body: JSON.stringify({ horarios: horariosActivos }),
           });
         }
+        // --- INICIO CÓDIGO TAREA 14 ---
+        // Actualizamos los datos localmente en el contexto pasando el token actual y el usuario modificado
+        if (login && usuario && token) {
+          login(token, {
+            ...usuario,
+            nombre: nombre.trim(),
+            apellido: apellido.trim(),
+            telefono: telefono.trim(),
+          });
+        }
 
-        Alert.alert(
-          "¡Perfil Actualizado!",
-          attachedDoc
-            ? "Tus cambios y la documentación de tu matrícula han sido guardados exitosamente. Estaremos haciéndote llegar las novedades."
-            : "Tus cambios han sido guardados exitosamente.",
-          [{ text: "Aceptar", onPress: () => router.back() }],
-        );
+        Alert.alert("Éxito", "Tus datos han sido guardados exitosamente.", [
+          { text: "Aceptar", onPress: () => router.back() },
+        ]);
+        // --- FIN CÓDIGO TAREA 14 ---
       } else {
         const errorData = await response.json().catch(() => ({}));
         Alert.alert(
           "Error al actualizar",
           errorData.error ||
-          "Hubo un problema al guardar los datos en el servidor.",
+            "Tus datos no han podido ser guardados, inténtalo más tarde.",
           [{ text: "Aceptar" }],
         );
       }
@@ -830,8 +909,12 @@ export default function EditProfileScreen() {
                   />
                 </View>
                 {showProFields && (
-                  <View style={[styles.inputGroup, { width: 110, marginLeft: 8 }]}>
-                    <Text style={[styles.label, { color: colors.text }]}>Años Exp.</Text>
+                  <View
+                    style={[styles.inputGroup, { width: 110, marginLeft: 8 }]}
+                  >
+                    <Text style={[styles.label, { color: colors.text }]}>
+                      Años Exp.
+                    </Text>
                     <TextInput
                       style={[
                         styles.input,
@@ -911,10 +994,10 @@ export default function EditProfileScreen() {
                     {
                       backgroundColor: disponible
                         ? colors.backgroundElement
-                        : ((colors as any).warningBg || "#FEF3E0"),
+                        : (colors as any).warningBg || "#FEF3E0",
                       borderColor: disponible
                         ? colors.backgroundSelected
-                        : ((colors as any).warning || "#F59E0B"),
+                        : (colors as any).warning || "#F59E0B",
                     },
                   ]}
                 >
@@ -925,18 +1008,20 @@ export default function EditProfileScreen() {
                           styles.statusIconBadge,
                           {
                             backgroundColor: disponible
-                              ? ((colors as any).successBg || "#E6F4EA")
-                              : ((colors as any).warningBg || "#FEF3E0"),
+                              ? (colors as any).successBg || "#E6F4EA"
+                              : (colors as any).warningBg || "#FEF3E0",
                           },
                         ]}
                       >
                         <Ionicons
-                          name={disponible ? "checkmark-circle" : "pause-circle"}
+                          name={
+                            disponible ? "checkmark-circle" : "pause-circle"
+                          }
                           size={22}
                           color={
                             disponible
-                              ? ((colors as any).success || "#10B981")
-                              : ((colors as any).warning || "#F59E0B")
+                              ? (colors as any).success || "#10B981"
+                              : (colors as any).warning || "#F59E0B"
                           }
                         />
                       </View>
@@ -956,8 +1041,8 @@ export default function EditProfileScreen() {
                             styles.statusCardBadgeText,
                             {
                               color: disponible
-                                ? ((colors as any).success || "#10B981")
-                                : ((colors as any).warning || "#F59E0B"),
+                                ? (colors as any).success || "#10B981"
+                                : (colors as any).warning || "#F59E0B",
                             },
                           ]}
                         >
@@ -1066,13 +1151,13 @@ export default function EditProfileScreen() {
                             styles.chip,
                             isSelected
                               ? {
-                                backgroundColor: colors.secondary,
-                                borderColor: colors.secondary,
-                              }
+                                  backgroundColor: colors.secondary,
+                                  borderColor: colors.secondary,
+                                }
                               : {
-                                backgroundColor: colors.backgroundElement,
-                                borderColor: colors.backgroundSelected,
-                              },
+                                  backgroundColor: colors.backgroundElement,
+                                  borderColor: colors.backgroundSelected,
+                                },
                           ]}
                           onPress={() => toggleOficio(oficio.id)}
                           activeOpacity={0.7}
@@ -1109,7 +1194,11 @@ export default function EditProfileScreen() {
                               ]}
                             >
                               <Ionicons
-                                name={pendingOficiosIds.includes(oficio.id) ? "time-outline" : "ribbon-outline"}
+                                name={
+                                  pendingOficiosIds.includes(oficio.id)
+                                    ? "time-outline"
+                                    : "ribbon-outline"
+                                }
                                 size={11}
                                 color={
                                   isSelected
@@ -1131,7 +1220,9 @@ export default function EditProfileScreen() {
                                   },
                                 ]}
                               >
-                                {pendingOficiosIds.includes(oficio.id) ? "En revisión" : "Matrícula"}
+                                {pendingOficiosIds.includes(oficio.id)
+                                  ? "En revisión"
+                                  : "Matrícula"}
                               </Text>
                             </View>
                           )}
@@ -1414,7 +1505,8 @@ export default function EditProfileScreen() {
                       { color: colors.textSecondary },
                     ]}
                   >
-                    Define los días y rangos de horario en los que puedes recibir solicitudes.
+                    Define los días y rangos de horario en los que puedes
+                    recibir solicitudes.
                   </Text>
 
                   {dias.map((dia) => {
@@ -1548,7 +1640,8 @@ export default function EditProfileScreen() {
                                   { color: colors.danger },
                                 ]}
                               >
-                                La hora de finalización debe ser posterior a la de inicio.
+                                La hora de finalización debe ser posterior a la
+                                de inicio.
                               </Text>
                             )}
                           </View>
@@ -1566,10 +1659,9 @@ export default function EditProfileScreen() {
                   styles.previewButton,
                   {
                     borderColor: colors.primary,
-                    backgroundColor:
-                      isDark
-                        ? "rgba(255, 140, 0, 0.12)"
-                        : "rgba(255, 140, 0, 0.08)",
+                    backgroundColor: isDark
+                      ? "rgba(255, 140, 0, 0.12)"
+                      : "rgba(255, 140, 0, 0.08)",
                   },
                 ]}
                 onPress={() => setShowPreview(true)}
@@ -1577,10 +1669,7 @@ export default function EditProfileScreen() {
               >
                 <Ionicons name="eye-outline" size={20} color={colors.primary} />
                 <Text
-                  style={[
-                    styles.previewButtonText,
-                    { color: colors.primary },
-                  ]}
+                  style={[styles.previewButtonText, { color: colors.primary }]}
                 >
                   Previsualizar Perfil (Vista Cliente)
                 </Text>
@@ -1643,6 +1732,7 @@ export default function EditProfileScreen() {
         visible={showPreview}
         onClose={() => setShowPreview(false)}
         onConfirmSave={handleSave}
+        profesionalId={usuario?.id || ""}
         nombre={nombre}
         apellido={apellido}
         fotoPerfil={getSafeAvatarUri(avatarUri)}

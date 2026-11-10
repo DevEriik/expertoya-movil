@@ -147,7 +147,12 @@ export default function MisSolicitudesScreen() {
           </Text>
         </View>
 
-        <Text style={[styles.descripcion, { color: colors.text }]}>
+        <Text
+          style={[
+            styles.descripcion,
+            { color: colors.text, backgroundColor: colors.background },
+          ]}
+        >
           "{item.descripcion}"
         </Text>
       </View>
@@ -164,7 +169,7 @@ export default function MisSolicitudesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* 3. NUEVA BARRA SUPERIOR CON FLECHA DE RETROCESO */}
+      
       <View
         style={[
           styles.headerBar,
@@ -282,7 +287,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: "italic",
     marginTop: 8,
-    backgroundColor: "#121826",
     padding: 8,
     borderRadius: 8,
   },
