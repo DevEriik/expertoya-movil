@@ -1,3 +1,4 @@
+import CreateReviewModal from "@/components/solicitudes/CreateReviewModal";
 import { useTheme } from "@/hooks/use-theme";
 import { apiClient } from "@/utils/api";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,7 +16,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface SolicitudEnviada {
   _id: string;
+  id?: string;
+  profesionalId?: string;
   profesional: {
+    id?: string;
     usuario: {
       nombre: string;
       apellido: string;
@@ -25,16 +29,26 @@ interface SolicitudEnviada {
   fechaTentativa: string;
   franjaHoraria: string;
   descripcion: string;
-  estado: "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "CANCELADA_AUTO";
+  estado: string;
   createdAt: string;
+  pagoLiberado?: boolean;
+  resena?: {
+    id: string;
+    calificacion: number;
+    comentario?: string | null;
+    fotosUrls?: string[];
+    createdAt: string;
+  } | null;
 }
 
 export default function MisSolicitudesScreen() {
   const colors = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets(); 
+  const insets = useSafeAreaInsets();
   const [solicitudes, setSolicitudes] = useState<SolicitudEnviada[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSolicitud, setSelectedSolicitud] = useState<SolicitudEnviada | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
 
   const fetchSolicitudes = async () => {
     try {
@@ -57,6 +71,13 @@ export default function MisSolicitudesScreen() {
 
   const getStatusBadge = (estado: string) => {
     switch (estado) {
+      case "FINALIZADO":
+      case "FINALIZADA":
+        return {
+          text: "Finalizada",
+          color: "#00BFA5",
+          icon: "checkmark-done-circle-outline",
+        };
       case "PENDIENTE":
         return {
           text: "Pendiente (Esperando respuesta)",
@@ -155,6 +176,48 @@ export default function MisSolicitudesScreen() {
         >
           "{item.descripcion}"
         </Text>
+
+        {(() => {
+          const esFinalizada =
+            item.estado === "FINALIZADO" || item.estado === "FINALIZADA";
+          const esLiberada = item.pagoLiberado !== false;
+
+          if (!esFinalizada || !esLiberada) return null;
+
+          if (item.resena) {
+            return (
+              <View style={styles.badgeCalificadoContainer}>
+                <View style={styles.badgeCalificado}>
+                  <Ionicons name="star" size={14} color="#F59E0B" />
+                  <Text style={styles.badgeCalificadoText}>
+                    Calificado ⭐ {item.resena.calificacion}/5
+                  </Text>
+                </View>
+                <Text style={styles.fechaResenaText}>
+                  {item.resena.createdAt
+                    ? formatearFecha(item.resena.createdAt)
+                    : ""}
+                </Text>
+              </View>
+            );
+          }
+
+          return (
+            <TouchableOpacity
+              style={styles.calificarBtn}
+              onPress={() => {
+                setSelectedSolicitud(item);
+                setShowReviewModal(true);
+              }}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Calificar servicio"
+            >
+              <Ionicons name="star" size={16} color="#FFFFFF" />
+              <Text style={styles.calificarBtnText}>Calificar servicio</Text>
+            </TouchableOpacity>
+          );
+        })()}
       </View>
     );
   };
@@ -169,7 +232,7 @@ export default function MisSolicitudesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      
+
       <View
         style={[
           styles.headerBar,
@@ -180,7 +243,7 @@ export default function MisSolicitudesScreen() {
           },
         ]}
       >
-    
+
         <TouchableOpacity
           onPress={() => {
             if (router.canGoBack()) {
@@ -194,12 +257,12 @@ export default function MisSolicitudesScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
-      
+
         <Text style={[styles.headerTitleText, { color: colors.text }]}>
           Historial de Solicitudes
         </Text>
 
-      
+
         <View style={{ width: 24 }} />
       </View>
 
@@ -229,6 +292,23 @@ export default function MisSolicitudesScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
+
+      {selectedSolicitud && (
+        <CreateReviewModal
+          visible={showReviewModal}
+          solicitudId={selectedSolicitud._id || selectedSolicitud.id!}
+          profesionalNombre={`${selectedSolicitud.profesional?.usuario?.nombre || "Profesional"} ${selectedSolicitud.profesional?.usuario?.apellido || ""}`.trim()}
+          onClose={() => {
+            setShowReviewModal(false);
+            setSelectedSolicitud(null);
+          }}
+          onSuccess={() => {
+            setShowReviewModal(false);
+            setSelectedSolicitud(null);
+            fetchSolicitudes();
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -236,7 +316,7 @@ export default function MisSolicitudesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
- 
+
   headerBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -262,7 +342,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   listContent: {
-    paddingHorizontal: 16, 
+    paddingHorizontal: 16,
     paddingBottom: 24,
   },
   card: { borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 12 },
@@ -303,4 +383,60 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   buscarBtnText: { color: "#121826", fontWeight: "bold", fontSize: 14 },
+  reviewTriggerContainer: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(150, 150, 150, 0.15)",
+  },
+  badgeCalificadoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(150, 150, 150, 0.15)",
+  },
+  badgeCalificado: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.3)",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+  },
+  badgeCalificadoText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#D97706",
+  },
+  fechaResenaText: {
+    fontSize: 11,
+    color: "#94A3B8",
+  },
+  calificarBtn: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#FF8C00",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    shadowColor: "#FF8C00",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  calificarBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+  },
 });
