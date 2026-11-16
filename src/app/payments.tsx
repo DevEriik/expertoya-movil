@@ -138,7 +138,7 @@ export default function PaymentsScreen() {
         {showClientSection && (
           <>
             <Text style={[styles.sectionTitle, { color: colors.primary }]}>
-              TARJETAS GUARDADAS (PARA PAGAR)
+              PAGOS CON MERCADO PAGO
             </Text>
             <View
               style={[
@@ -147,11 +147,11 @@ export default function PaymentsScreen() {
               ]}
             >
               <PaymentOption
-                icon="card-outline"
-                title="Visa terminada en 4321"
-                subtitle="Vence el 12/28"
-                iconColor={colors.info}
-                iconBg={colors.infoBg}
+                icon="shield-checkmark-outline"
+                title="Checkout Pro"
+                subtitle="Pagás en el sitio seguro de Mercado Pago"
+                iconColor="#009EE3"
+                iconBg="#E6F5FC"
                 isConfigured={true}
               />
               <View
@@ -160,17 +160,16 @@ export default function PaymentsScreen() {
                   { backgroundColor: colors.backgroundSelected },
                 ]}
               />
-
-              <TouchableOpacity style={styles.addCardButton}>
-                <Ionicons
-                  name="add-circle-outline"
-                  size={24}
-                  color={colors.primary}
-                />
-                <Text style={[styles.addCardText, { color: colors.primary }]}>
-                  Agregar nueva tarjeta
-                </Text>
-              </TouchableOpacity>
+              <Text
+                style={[
+                  styles.cardHelper,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                ExpertoYa no guarda datos de tarjetas. El pago se completa en
+                Mercado Pago y queda retenido en garantía hasta que ambas partes
+                confirmen la finalización.
+              </Text>
             </View>
           </>
         )}
@@ -260,6 +259,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   badgeText: { fontSize: 12, fontWeight: "700" },
+
+  cardHelper: {
+    fontSize: 13,
+    lineHeight: 19,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
 
   addCardButton: {
     flexDirection: "row",
