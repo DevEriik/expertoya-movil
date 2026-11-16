@@ -24,8 +24,7 @@
         "ACCESS_NETWORK_STATE",
         "BLUETOOTH",
         "VIBRATE"
-      ],
-      "googleServicesFile": "./google-services.json"
+      ]
     },
     "web": {
       "output": "static",
@@ -59,7 +58,8 @@
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": false
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
