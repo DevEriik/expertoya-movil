@@ -100,7 +100,6 @@ interface Props {
   isDark?: boolean;
   onBack: () => void;
   onSendMessage: (chatId: string, text: string) => void;
-  onReleaseFunds: (chatId: string) => void;
 }
 
 const getDefaultSuggestions = (role: UserRole) =>
@@ -123,7 +122,6 @@ export const ActiveConversation: React.FC<Props> = ({
   isDark = false,
   onBack,
   onSendMessage,
-  onReleaseFunds,
 }) => {
   const [inputText, setInputText] = useState('');
   const [sugerencias, setSugerencias] = useState<string[]>(() =>
@@ -624,19 +622,8 @@ export const ActiveConversation: React.FC<Props> = ({
     }
   };
 
-  const handleReleasePress = () => {
-    Alert.alert(
-      'Liberar Fondos en Custodia',
-      `¿Deseas confirmar la liberación de ${chat.escrowAmount} a ${otherPerson.name}?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Confirmar y Liberar',
-          style: 'default',
-          onPress: () => onReleaseFunds(chat.id),
-        },
-      ]
-    );
+  const handlePaymentPress = () => {
+    router.push(`/pagos/${chat.id}`);
   };
 
   const renderStatusTicks = (msg: any, isCurrentUser: boolean) => {
@@ -907,17 +894,15 @@ export const ActiveConversation: React.FC<Props> = ({
                 <Text style={styles.securityTipsBtnText}>Seguridad</Text>
               </TouchableOpacity>
 
-              {activeRole === 'CLIENTE' && hasEscrow && chat.escrowStatus !== 'RELEASED' && (
-                <TouchableOpacity
-                  style={styles.releaseButton}
-                  onPress={handleReleasePress}
-                  activeOpacity={0.85}
-                  accessible={true}
-                  accessibilityLabel="Liberar fondos retenidos en fideicomiso"
-                >
-                  <Text style={styles.releaseButtonText}>Liberar Fondos</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.releaseButton}
+                onPress={handlePaymentPress}
+                activeOpacity={0.85}
+                accessible={true}
+                accessibilityLabel="Gestionar el pago de la solicitud"
+              >
+                <Text style={styles.releaseButtonText}>Gestionar pago</Text>
+              </TouchableOpacity>
             </View>
           </View>
         );

@@ -29,6 +29,7 @@ import { useAccessibility } from "@/context/AccessibilityContext";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/use-theme";
 import { apiClient } from "@/utils/api";
+import { createFormDataFile } from "@/utils/fileUpload";
 import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
 
 const ZONAS_SUGERIDAS = [
@@ -424,8 +425,9 @@ export default function EditProfileScreen() {
               setTelefono(data.telefono || "");
               setBio(data.descripcion_perfil || "");
               setZonasCobertura(data.ubicacion_geografica || "");
-              if (data.experiencia !== undefined && data.experiencia !== null) {
-                setAniosExperiencia(String(data.experiencia));
+              const exp = data.experiencia ?? data.anios_experiencia;
+              if (exp !== undefined && exp !== null) {
+                setAniosExperiencia(String(exp));
               }
               if (data.foto_perfil) {
                 const isExpired =
@@ -585,27 +587,57 @@ export default function EditProfileScreen() {
 
     try {
       const isEphemeralUri =
-        avatarUri.startsWith("blob:") || avatarUri.startsWith("file://");
+        avatarUri.startsWith("blob:") ||
+        avatarUri.startsWith("file://") ||
+        avatarUri.startsWith("content://");
 
+      let updatedFotoUrl: string | undefined = undefined;
       let response: Response;
 
       if (isEphemeralUri) {
-        const fotoData = new FormData();
-        fotoData.append("foto", {
-          uri: avatarUri,
-          name: "perfil.jpg",
-          type: "image/jpeg",
-        } as any);
+        try {
+          const rawFilename = avatarUri.split("/").pop() || "perfil.jpg";
+          const extMatch = /\.(jpe?g|png|webp|heic)$/i.exec(rawFilename);
+          const ext = extMatch ? extMatch[1].toLowerCase() : "jpg";
+          const filename = rawFilename.includes(".") ? rawFilename : `perfil.${ext}`;
+          const mimeType =
+            ext === "png"
+              ? "image/png"
+              : ext === "webp"
+              ? "image/webp"
+              : "image/jpeg";
 
-        const fotoResponse = await apiClient("/api/clientes/me/foto", {
-          method: "POST",
-          body: fotoData,
-        });
+          const filePart = await createFormDataFile(avatarUri, filename, mimeType);
+          const fotoData = new FormData();
+          if (Platform.OS === "web" || filePart instanceof Blob) {
+            const finalBlob =
+              filePart instanceof Blob &&
+              (!filePart.type || filePart.type === "application/octet-stream")
+                ? filePart.slice(0, filePart.size, mimeType)
+                : filePart;
+            fotoData.append("foto", finalBlob, filename);
+          } else {
+            (fotoData as any).append("foto", filePart);
+          }
 
-        if (!fotoResponse.ok) {
-          console.warn(
-            "Error subiendo la foto, pero continuando con el perfil.",
-          );
+          const fotoResponse = await apiClient("/api/usuarios/me/foto", {
+            method: "POST",
+            body: fotoData,
+          });
+
+          if (fotoResponse.ok) {
+            const fotoJson = await fotoResponse.json();
+            if (fotoJson.foto_perfil) {
+              updatedFotoUrl = fotoJson.foto_perfil;
+              setAvatarUri(fotoJson.foto_perfil);
+            }
+          } else {
+            console.warn(
+              "Error subiendo la foto, pero continuando con el perfil.",
+            );
+          }
+        } catch (fotoErr) {
+          console.warn("No se pudo procesar la foto de perfil:", fotoErr);
         }
       }
 
@@ -614,39 +646,43 @@ export default function EditProfileScreen() {
         formData.append("nombre", nombre.trim());
         formData.append("apellido", apellido.trim());
         formData.append("telefono", telefono.trim());
-        if (!isEphemeralUri && avatarUri) {
-          formData.append("foto_perfil", avatarUri);
+        const fotoToSend = updatedFotoUrl || (!isEphemeralUri && avatarUri ? avatarUri : undefined);
+        if (fotoToSend) {
+          formData.append("foto_perfil", fotoToSend);
         }
         formData.append("descripcion_perfil", bio.trim());
         formData.append("ubicacion_geografica", zonasCobertura.trim());
         formData.append("disponible", String(disponible));
         if (aniosExperiencia.trim()) {
           formData.append("experiencia", aniosExperiencia.trim());
+          formData.append("anios_experiencia", aniosExperiencia.trim());
         }
         formData.append("oficios_ids", JSON.stringify(selectedOficios));
-        if (Platform.OS === "web") {
-          try {
-            const resBlob = await fetch(attachedDoc.uri);
-            const blob = await resBlob.blob();
-            const fileName = attachedDoc.name || "matricula_profesional.pdf";
-            formData.append("matricula_documento", blob, fileName);
-          } catch (blobErr) {
-            console.error(
-              "Error al preparar blob de documento en web:",
-              blobErr,
-            );
-            (formData as any).append("matricula_documento", {
-              uri: attachedDoc.uri,
-              name: attachedDoc.name || "matricula_profesional.pdf",
-              type: attachedDoc.mimeType || "application/pdf",
-            });
+
+        try {
+          const docName = attachedDoc.name || "matricula_profesional.pdf";
+          const docMime =
+            attachedDoc.mimeType ||
+            (docName.toLowerCase().endsWith(".pdf")
+              ? "application/pdf"
+              : "image/jpeg");
+          const docPart = await createFormDataFile(
+            attachedDoc.uri,
+            docName,
+            docMime,
+          );
+          if (Platform.OS === "web" || docPart instanceof Blob) {
+            const finalBlob =
+              docPart instanceof Blob &&
+              (!docPart.type || docPart.type === "application/octet-stream")
+                ? docPart.slice(0, docPart.size, docMime)
+                : docPart;
+            formData.append("matricula_documento", finalBlob, docName);
+          } else {
+            (formData as any).append("matricula_documento", docPart);
           }
-        } else {
-          (formData as any).append("matricula_documento", {
-            uri: attachedDoc.uri,
-            name: attachedDoc.name || "matricula_profesional.pdf",
-            type: attachedDoc.mimeType || "application/pdf",
-          });
+        } catch (docErr) {
+          console.error("Error al preparar documento adjunto:", docErr);
         }
 
         response = await apiClient("/api/professionals/profile", {
@@ -654,16 +690,20 @@ export default function EditProfileScreen() {
           body: formData,
         });
       } else {
+        const fotoToSend = updatedFotoUrl || (!isEphemeralUri && avatarUri ? avatarUri : undefined);
         const payload: any = {
           nombre: nombre.trim(),
           apellido: apellido.trim(),
           telefono: telefono.trim(),
-          foto_perfil: isEphemeralUri ? undefined : avatarUri,
+          ...(fotoToSend ? { foto_perfil: fotoToSend } : {}),
           descripcion_perfil: bio.trim(),
           ubicacion_geografica: zonasCobertura.trim(),
           disponible,
           ...(aniosExperiencia.trim()
-            ? { experiencia: parseInt(aniosExperiencia.trim(), 10) }
+            ? {
+                experiencia: parseInt(aniosExperiencia.trim(), 10),
+                anios_experiencia: parseInt(aniosExperiencia.trim(), 10),
+              }
             : {}),
         };
 
@@ -705,6 +745,7 @@ export default function EditProfileScreen() {
             nombre: nombre.trim(),
             apellido: apellido.trim(),
             telefono: telefono.trim(),
+            ...(updatedFotoUrl ? { foto_perfil: updatedFotoUrl } : {}),
           });
         }
 
@@ -1653,28 +1694,28 @@ export default function EditProfileScreen() {
               </>
             )}
 
-            {showProFields && (
-              <TouchableOpacity
-                style={[
-                  styles.previewButton,
-                  {
-                    borderColor: colors.primary,
-                    backgroundColor: isDark
-                      ? "rgba(255, 140, 0, 0.12)"
-                      : "rgba(255, 140, 0, 0.08)",
-                  },
-                ]}
-                onPress={() => setShowPreview(true)}
-                activeOpacity={0.8}
+            <TouchableOpacity
+              style={[
+                styles.previewButton,
+                {
+                  borderColor: colors.primary,
+                  backgroundColor: isDark
+                    ? "rgba(255, 140, 0, 0.12)"
+                    : "rgba(255, 140, 0, 0.08)",
+                },
+              ]}
+              onPress={() => setShowPreview(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="eye-outline" size={20} color={colors.primary} />
+              <Text
+                style={[styles.previewButtonText, { color: colors.primary }]}
               >
-                <Ionicons name="eye-outline" size={20} color={colors.primary} />
-                <Text
-                  style={[styles.previewButtonText, { color: colors.primary }]}
-                >
-                  Previsualizar Perfil (Vista Cliente)
-                </Text>
-              </TouchableOpacity>
-            )}
+                {showProFields
+                  ? "Previsualizar Perfil (Vista Cliente)"
+                  : "Previsualizar Perfil (Vista Profesional)"}
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[
@@ -1732,9 +1773,12 @@ export default function EditProfileScreen() {
         visible={showPreview}
         onClose={() => setShowPreview(false)}
         onConfirmSave={handleSave}
+        isCliente={!showProFields}
         profesionalId={usuario?.id || ""}
         nombre={nombre}
         apellido={apellido}
+        email={usuario?.email || ""}
+        telefono={telefono}
         fotoPerfil={getSafeAvatarUri(avatarUri)}
         bio={bio}
         zonasCobertura={zonasCobertura}

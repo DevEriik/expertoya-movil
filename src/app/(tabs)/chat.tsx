@@ -111,16 +111,6 @@ export default function ChatScreen() {
   const handleSendMessage = (targetChatId: string, text: string) => {
   };
 
-  const handleReleaseFunds = (targetChatId: string) => {
-    setChats((prev) =>
-      prev.map((c) =>
-        c.id === targetChatId
-          ? { ...c, escrowStatus: 'RELEASED', status: 'COMPLETADO' }
-          : c
-      )
-    );
-  };
-
   return (
     <View
       style={[
@@ -143,7 +133,6 @@ export default function ChatScreen() {
             fetchConversaciones();
           }}
           onSendMessage={handleSendMessage}
-          onReleaseFunds={handleReleaseFunds}
         />
       ) : (
         <MessagesList

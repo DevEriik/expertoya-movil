@@ -69,6 +69,7 @@ interface CardProps {
   onCancelarRechazo: () => void;
   onConfirmarRechazo: () => void;
   onChatear: () => void;
+  onPagar: () => void;
 }
 
 function Detalle({
@@ -107,6 +108,7 @@ function SolicitudCard({
   onCancelarRechazo,
   onConfirmarRechazo,
   onChatear,
+  onPagar,
 }: CardProps) {
   const router = useRouter();
   const c = paleta(isDark);
@@ -122,6 +124,7 @@ function SolicitudCard({
   > = {
     PENDIENTE: { texto: "Pendiente", icono: "time-outline", color: c.aviso },
     ACEPTADO: { texto: "Aceptada", icono: "checkmark-circle", color: c.exito },
+    EN_CURSO: { texto: "En curso", icono: "construct", color: c.naranja },
     RECHAZADO: { texto: "Rechazada", icono: "close-circle", color: c.peligro },
     CANCELADO: {
       texto: "Cancelada por el cliente",
@@ -380,6 +383,18 @@ function SolicitudCard({
                   </>
                 )}
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.botonOutline, { borderColor: c.exito }]}
+                onPress={onPagar}
+                accessibilityRole="button"
+                accessibilityLabel="Gestionar el pago de esta solicitud"
+              >
+                <Ionicons name="card-outline" size={20} color={c.exito} />
+                <Text style={[styles.botonTexto, { color: c.exito }]}>
+                  Gestionar pago
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -628,6 +643,7 @@ export default function SolicitudesTrabajoScreen() {
                 onCancelarRechazo={() => setConfirmandoId(null)}
                 onConfirmarRechazo={() => responder(s.id, "rechazar")}
                 onChatear={() => irAlChat(s)}
+                onPagar={() => router.push(`/pagos/${s.id}`)}
               />
             ))
           )}

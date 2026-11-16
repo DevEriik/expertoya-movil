@@ -1,12 +1,15 @@
 import SolicitudModal from "@/components/inicio/SolicitudModal";
 import ServiceDetailModal from "@/components/ServiceDetailModal";
 import { useAccessibility } from "@/context/AccessibilityContext";
+import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/use-theme";
 import { ServicioPublicadoItem } from "@/types/service";
+import { apiClient } from "@/utils/api";
 import { getServices } from "@/utils/servicesStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -14,6 +17,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -24,6 +28,9 @@ interface ProfilePreviewModalProps {
   onClose: () => void;
   onConfirmSave?: () => void;
   onContact?: () => void;
+  isCliente?: boolean;
+  email?: string;
+  telefono?: string;
   nombre: string;
   apellido: string;
   fotoPerfil?: string;
@@ -42,6 +49,9 @@ export default function ProfilePreviewModal({
   onClose,
   onConfirmSave,
   onContact,
+  isCliente = false,
+  email = "",
+  telefono = "",
   nombre,
   apellido,
   fotoPerfil,
@@ -65,6 +75,118 @@ export default function ProfilePreviewModal({
     useState<ServicioPublicadoItem | null>(null);
 
   const [solicitudVisible, setSolicitudVisible] = useState(false);
+
+  const { usuario } = useAuth();
+  const isCurrentPro = Boolean(
+    usuario?.id &&
+      (usuario.id === profesionalId ||
+        usuario.rol === "PROFESIONAL" ||
+        usuario.id === (usuario as any)?.userId)
+  );
+
+  interface ReviewItem {
+    id: string;
+    calificacion: number;
+    comentario?: string | null;
+    fotosUrls: string[];
+    respuestaProfesional?: string | null;
+    fechaRespuesta?: string | null;
+    createdAt: string;
+    cliente: {
+      id: string;
+      nombre: string;
+      apellido: string;
+      foto_perfil?: string | null;
+    };
+  }
+
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [cargandoReviews, setCargandoReviews] = useState(false);
+  const [currentRating, setCurrentRating] = useState<number>(calificacion);
+  const [currentTotalReviews, setCurrentTotalReviews] =
+    useState<number>(totalReviews);
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const [replyingReviewId, setReplyingReviewId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState<string>("");
+  const [sendingReply, setSendingReply] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!visible || !profesionalId || isCliente) return;
+
+    const fetchReviews = async () => {
+      setCargandoReviews(true);
+      try {
+        const res = await apiClient(
+          `/api/professionals/${profesionalId}/reviews?page=1&limit=20`
+        );
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data) {
+            setReviews(json.data.resenas || []);
+            if (json.data.stats) {
+              setCurrentRating(
+                json.data.stats.calificacionPromedio ?? calificacion
+              );
+              setCurrentTotalReviews(
+                json.data.stats.totalResenas ?? totalReviews
+              );
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error al cargar reseñas del profesional:", e);
+      } finally {
+        setCargandoReviews(false);
+      }
+    };
+
+    fetchReviews();
+  }, [visible, profesionalId, calificacion, totalReviews]);
+
+  const handleSendReply = async (reviewId: string) => {
+    if (!replyText.trim()) {
+      Alert.alert("Atención", "Por favor ingresa una respuesta.");
+      return;
+    }
+
+    try {
+      setSendingReply(true);
+      const res = await apiClient(`/api/reviews/${reviewId}/reply`, {
+        method: "POST",
+        body: JSON.stringify({ respuesta: replyText.trim() }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          json.detalle || json.error || "No se pudo enviar la respuesta"
+        );
+      }
+
+      Alert.alert(
+        "Respuesta registrada",
+        "Tu respuesta ha sido publicada de manera definitiva e inmutable."
+      );
+      setReviews((prev) =>
+        prev.map((r) =>
+          r.id === reviewId
+            ? {
+                ...r,
+                respuestaProfesional: replyText.trim(),
+                fechaRespuesta: new Date().toISOString(),
+              }
+            : r
+        )
+      );
+      setReplyingReviewId(null);
+      setReplyText("");
+    } catch (error: any) {
+      console.error("Error al responder reseña:", error);
+      Alert.alert("Error", error.message || "No se pudo registrar la respuesta.");
+    } finally {
+      setSendingReply(false);
+    }
+  };
 
   useEffect(() => {
     if (servicios && servicios.length > 0) {
@@ -139,11 +261,18 @@ export default function ProfilePreviewModal({
             <View
               style={[
                 styles.previewNoticeBadge,
-                { top: Math.max(insets.top + 10, 22) },
+                {
+                  top: Math.max(insets.top + 10, 22),
+                  backgroundColor: isCliente
+                    ? "rgba(0, 191, 165, 0.9)"
+                    : "rgba(40, 53, 147, 0.85)",
+                },
               ]}
             >
               <Ionicons name="eye-outline" size={14} color="#FFFFFF" />
-              <Text style={styles.previewNoticeText}>Vista del Cliente</Text>
+              <Text style={styles.previewNoticeText}>
+                {isCliente ? "Vista del Profesional" : "Vista del Cliente"}
+              </Text>
             </View>
           </View>
 
@@ -201,86 +330,245 @@ export default function ProfilePreviewModal({
                     { color: isDark ? "#33EFA5" : "#00BFA5" },
                   ]}
                 >
-                  Identidad y Matrícula Verificada
+                  {isCliente
+                    ? "Cuenta de Cliente Verificada"
+                    : "Identidad y Matrícula Verificada"}
                 </Text>
               </View>
             </View>
 
-            <View style={styles.metaRow}>
-              <Ionicons name="flash" size={16} color="#FF8C00" />
-              <Text
-                style={[
-                  styles.metaText,
-                  { color: isDark ? "#E2E8F0" : "#283593" },
-                ]}
-              >
-                {oficioPrincipal}
-              </Text>
-            </View>
+            {isCliente ? (
+              <>
+                <View style={styles.metaRow}>
+                  <Ionicons name="person-outline" size={16} color="#00BFA5" />
+                  <Text
+                    style={[
+                      styles.metaText,
+                      { color: isDark ? "#E2E8F0" : "#283593" },
+                    ]}
+                  >
+                    Cliente de ExpertoYa • Pagos Protegidos
+                  </Text>
+                </View>
 
-            {aniosExperiencia ? (
-              <View style={styles.metaRow}>
-                <Ionicons name="time-outline" size={16} color="#FF8C00" />
-                <Text
-                  style={[
-                    styles.metaText,
-                    { color: isDark ? "#E2E8F0" : "#283593" },
-                  ]}
-                >
-                  {aniosExperiencia}{" "}
-                  {Number(aniosExperiencia) === 1 ? "año" : "años"} de
-                  experiencia
-                </Text>
-              </View>
-            ) : null}
+                {email ? (
+                  <View style={styles.metaRow}>
+                    <Ionicons
+                      name="mail-outline"
+                      size={16}
+                      color={isDark ? "#94A3B8" : "#60646C"}
+                    />
+                    <Text
+                      style={[
+                        styles.metaSubText,
+                        { color: isDark ? "#94A3B8" : "#60646C" },
+                      ]}
+                    >
+                      {email}
+                    </Text>
+                  </View>
+                ) : null}
 
-            <View style={styles.metaRow}>
-              <Ionicons name="star" size={16} color="#F59E0B" />
-              <Text
-                style={[
-                  styles.metaBoldText,
-                  { color: isDark ? "#FDFCF4" : "#1E293B" },
-                ]}
-              >
-                {calificacion.toFixed(1)}
-              </Text>
-              <Text
-                style={[
-                  styles.metaSubText,
-                  { color: isDark ? "#94A3B8" : "#60646C" },
-                ]}
-              >
-                ({totalReviews} opiniones)
-              </Text>
-            </View>
+                {telefono ? (
+                  <View style={styles.metaRow}>
+                    <Ionicons
+                      name="call-outline"
+                      size={16}
+                      color={isDark ? "#94A3B8" : "#60646C"}
+                    />
+                    <Text
+                      style={[
+                        styles.metaSubText,
+                        { color: isDark ? "#94A3B8" : "#60646C" },
+                      ]}
+                    >
+                      {telefono}
+                    </Text>
+                  </View>
+                ) : null}
 
-            <View style={styles.metaRow}>
-              <Ionicons
-                name="location-outline"
-                size={16}
-                color={isDark ? "#94A3B8" : "#60646C"}
-              />
-              <Text
-                style={[
-                  styles.metaSubText,
-                  { color: isDark ? "#94A3B8" : "#60646C" },
-                ]}
-                numberOfLines={1}
-              >
-                {zonasCobertura?.trim() || "Neuquén Capital (1.2 km)"}
-              </Text>
-            </View>
+                <View style={styles.metaRow}>
+                  <Ionicons
+                    name="location-outline"
+                    size={16}
+                    color={isDark ? "#94A3B8" : "#60646C"}
+                  />
+                  <Text
+                    style={[
+                      styles.metaSubText,
+                      { color: isDark ? "#94A3B8" : "#60646C" },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {zonasCobertura?.trim() || "Argentina"}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.metaRow}>
+                  <Ionicons name="flash" size={16} color="#FF8C00" />
+                  <Text
+                    style={[
+                      styles.metaText,
+                      { color: isDark ? "#E2E8F0" : "#283593" },
+                    ]}
+                  >
+                    {oficioPrincipal}
+                  </Text>
+                </View>
+
+                {aniosExperiencia ? (
+                  <View style={styles.metaRow}>
+                    <Ionicons name="time-outline" size={16} color="#FF8C00" />
+                    <Text
+                      style={[
+                        styles.metaText,
+                        { color: isDark ? "#E2E8F0" : "#283593" },
+                      ]}
+                    >
+                      {aniosExperiencia}{" "}
+                      {Number(aniosExperiencia) === 1 ? "año" : "años"} de
+                      experiencia
+                    </Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.metaRow}>
+                  <Ionicons name="star" size={16} color="#F59E0B" />
+                  <Text
+                    style={[
+                      styles.metaBoldText,
+                      { color: isDark ? "#FDFCF4" : "#1E293B" },
+                    ]}
+                  >
+                    {currentRating > 0 ? currentRating.toFixed(1) : "Nuevo"}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.metaSubText,
+                      { color: isDark ? "#94A3B8" : "#60646C" },
+                    ]}
+                  >
+                    ({currentTotalReviews}{" "}
+                    {currentTotalReviews === 1 ? "opinión" : "opiniones"})
+                  </Text>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <Ionicons
+                    name="location-outline"
+                    size={16}
+                    color={isDark ? "#94A3B8" : "#60646C"}
+                  />
+                  <Text
+                    style={[
+                      styles.metaSubText,
+                      { color: isDark ? "#94A3B8" : "#60646C" },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {zonasCobertura?.trim() || "Neuquén Capital (1.2 km)"}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
 
-          <View
-            style={[
-              styles.sectionCard,
-              {
-                backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
-                borderColor: isDark ? "#2A3649" : "#F0F0E8",
-              },
-            ]}
-          >
+          {isCliente ? (
+            <>
+              <View
+                style={[
+                  styles.sectionCard,
+                  {
+                    backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+                    borderColor: isDark ? "#2A3649" : "#F0F0E8",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.cardTitle,
+                    { color: isDark ? "#FDFCF4" : "#283593" },
+                  ]}
+                >
+                  Vista que recibe el Profesional
+                </Text>
+                <Text
+                  style={[
+                    styles.bioText,
+                    { color: isDark ? "#CBD5E1" : "#475569" },
+                  ]}
+                >
+                  Así es como los profesionales ven tu perfil cuando te comunicas por el chat o solicitas un presupuesto. Esta información les permite identificarte con confianza y coordinar los detalles del trabajo.
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.sectionCard,
+                  {
+                    backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+                    borderColor: isDark ? "#2A3649" : "#F0F0E8",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.cardTitle,
+                    { color: isDark ? "#FDFCF4" : "#283593" },
+                  ]}
+                >
+                  Garantía y Seguridad de Pagos (Escrow)
+                </Text>
+                <Text
+                  style={[
+                    styles.bioText,
+                    { color: isDark ? "#CBD5E1" : "#475569" },
+                  ]}
+                >
+                  Tus contrataciones cuentan con fondos en custodia segura. El profesional tiene la certeza de que el pago está retenido y solo se liberará cuando confirmes tu total conformidad con el trabajo realizado.
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.sectionCard,
+                  {
+                    backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+                    borderColor: isDark ? "#2A3649" : "#F0F0E8",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.cardTitle,
+                    { color: isDark ? "#FDFCF4" : "#283593" },
+                  ]}
+                >
+                  Sistema de Reseñas Closed-Loop
+                </Text>
+                <Text
+                  style={[
+                    styles.bioText,
+                    { color: isDark ? "#CBD5E1" : "#475569" },
+                  ]}
+                >
+                  Al concretarse y liberarse cada trabajo, tendrás habilitada la opción de calificar al profesional de manera inmutable con estrellas y fotos de evidencia.
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View
+                style={[
+                  styles.sectionCard,
+                  {
+                    backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+                    borderColor: isDark ? "#2A3649" : "#F0F0E8",
+                  },
+                ]}
+              >
             <Text
               style={[
                 styles.cardTitle,
@@ -325,19 +613,10 @@ export default function ProfilePreviewModal({
               <Text
                 style={[
                   styles.cardTitle,
-                  { color: isDark ? "#FDFCF4" : "#283593" },
+                  { color: isDark ? "#FDFCF4" : "#283593", marginBottom: 0 },
                 ]}
               >
                 Servicios del Profesional ({activeServices.length})
-              </Text>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: isDark ? "#94A3B8" : "#60646C",
-                  fontWeight: "600",
-                }}
-              >
-                Toca para ver detalle
               </Text>
             </View>
 
@@ -426,14 +705,14 @@ export default function ProfilePreviewModal({
             ]}
           >
             <View style={styles.reviewsHeaderRow}>
-              <View>
+              <View style={styles.reviewsHeaderLeft}>
                 <Text
                   style={[
                     styles.cardTitle,
                     { color: isDark ? "#FDFCF4" : "#283593", marginBottom: 2 },
                   ]}
                 >
-                  Reseñas Verificadas
+                  Opiniones de Clientes
                 </Text>
                 <Text
                   style={[
@@ -441,66 +720,309 @@ export default function ProfilePreviewModal({
                     { color: isDark ? "#94A3B8" : "#64748B" },
                   ]}
                 >
-                  Solo clientes con pagos liberados en ExpertoYa.
+                  Sistema Closed-Loop: opiniones reales con pago liberado.
                 </Text>
               </View>
-              <View style={styles.ratingBigRow}>
+              <View
+                style={[
+                  styles.ratingBigBadge,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(245, 158, 11, 0.15)"
+                      : "#FEF3C7",
+                    borderColor: isDark ? "#78350F" : "#FDE68A",
+                  },
+                ]}
+              >
+                <Ionicons name="star" size={16} color="#F59E0B" />
                 <Text
                   style={[
                     styles.ratingBigNumber,
-                    { color: isDark ? "#FDFCF4" : "#1E293B" },
+                    { color: isDark ? "#FBBF24" : "#B45309" },
                   ]}
                 >
-                  4.9
+                  {currentRating > 0 ? currentRating.toFixed(1) : "-"}
                 </Text>
-                <Ionicons name="star" size={20} color="#F59E0B" />
               </View>
             </View>
 
-            <View
-              style={[
-                styles.reviewItemCard,
-                {
-                  backgroundColor: isDark ? "#121826" : "#FDFCF4",
-                  borderColor: isDark ? "#2A3649" : "#F0F0E8",
-                },
-              ]}
-            >
-              <View style={styles.reviewUserRow}>
+            {cargandoReviews ? (
+              <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                <ActivityIndicator color="#FF8C00" size="small" />
+              </View>
+            ) : reviews.length === 0 ? (
+              <View
+                style={[
+                  styles.emptyReviewsBox,
+                  {
+                    backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
+                    borderColor: isDark ? "#1E293B" : "#E2E8F0",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={32}
+                  color={isDark ? "#475569" : "#CBD5E1"}
+                />
                 <Text
                   style={[
-                    styles.reviewerName,
-                    { color: isDark ? "#FDFCF4" : "#1E293B" },
+                    styles.emptyReviewsText,
+                    { color: isDark ? "#94A3B8" : "#64748B" },
                   ]}
                 >
-                  Martín G.
+                  Este profesional todavía no tiene opiniones registradas. Las
+                  calificaciones se habilitan únicamente al concretar y liberar un trabajo.
                 </Text>
-                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                <View style={styles.starsRow}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Ionicons key={s} name="star" size={12} color="#F59E0B" />
-                  ))}
-                </View>
               </View>
-              <Text
-                style={[
-                  styles.reviewComment,
-                  { color: isDark ? "#94A3B8" : "#60646C" },
-                ]}
-              >
-                Super profesional. Diagnosticó y resolvió el problema en tiempo
-                récord. Muy recomendado.
-              </Text>
-              <Text
-                style={[
-                  styles.reviewDate,
-                  { color: isDark ? "#64748B" : "#94A3B8" },
-                ]}
-              >
-                Hace 2 semanas
-              </Text>
-            </View>
+            ) : (
+              <View style={{ gap: 12 }}>
+                {reviews.map((rev) => {
+                  const clienteNombre = rev.cliente
+                    ? `${rev.cliente.nombre} ${rev.cliente.apellido?.[0] ? rev.cliente.apellido[0] + "." : ""}`.trim()
+                    : "Cliente";
+
+                  return (
+                    <View
+                      key={rev.id}
+                      style={[
+                        styles.reviewItemCard,
+                        {
+                          backgroundColor: isDark ? "#121826" : "#FDFCF4",
+                          borderColor: isDark ? "#2A3649" : "#F0F0E8",
+                        },
+                      ]}
+                    >
+                      <View style={styles.reviewUserRow}>
+                        {rev.cliente?.foto_perfil ? (
+                          <Image
+                            source={{ uri: rev.cliente.foto_perfil }}
+                            style={styles.reviewerAvatar}
+                          />
+                        ) : (
+                          <View
+                            style={[
+                              styles.reviewerAvatarFallback,
+                              { backgroundColor: "#00BFA5" + "22" },
+                            ]}
+                          >
+                            <Text style={styles.reviewerInitial}>
+                              {clienteNombre[0] || "C"}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.reviewerName,
+                                { color: isDark ? "#FDFCF4" : "#1E293B" },
+                              ]}
+                            >
+                              {clienteNombre}
+                            </Text>
+                            <Ionicons
+                              name="shield-checkmark"
+                              size={13}
+                              color="#00BFA5"
+                            />
+                          </View>
+                          <Text
+                            style={[
+                              styles.reviewDate,
+                              { color: isDark ? "#64748B" : "#94A3B8" },
+                            ]}
+                          >
+                            {new Date(rev.createdAt).toLocaleDateString("es-AR", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </Text>
+                        </View>
+
+                        <View style={styles.starsRow}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Ionicons
+                              key={s}
+                              name={s <= rev.calificacion ? "star" : "star-outline"}
+                              size={13}
+                              color={s <= rev.calificacion ? "#F59E0B" : "#CBD5E1"}
+                            />
+                          ))}
+                        </View>
+                      </View>
+
+                      {rev.comentario ? (
+                        <Text
+                          style={[
+                            styles.reviewComment,
+                            { color: isDark ? "#CBD5E1" : "#475569" },
+                          ]}
+                        >
+                          {rev.comentario}
+                        </Text>
+                      ) : null}
+
+                      {/* Fotos de la reseña (hasta 2) ampliables */}
+                      {rev.fotosUrls && rev.fotosUrls.length > 0 && (
+                        <View style={styles.reviewPhotosRow}>
+                          {rev.fotosUrls.map((url, fIndex) => (
+                            <TouchableOpacity
+                              key={fIndex}
+                              onPress={() => setExpandedImage(url)}
+                              activeOpacity={0.8}
+                            >
+                              <Image
+                                source={{ uri: url }}
+                                style={styles.reviewPhotoThumb}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+
+                      {/* Respuesta del Profesional Indentada */}
+                      {rev.respuestaProfesional ? (
+                        <View
+                          style={[
+                            styles.proReplyContainer,
+                            {
+                              backgroundColor: isDark
+                                ? "#0F172A"
+                                : "#F0FDFA",
+                              borderColor: isDark ? "#1E293B" : "#CCFBF1",
+                            },
+                          ]}
+                        >
+                          <View style={styles.proReplyHeader}>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 6,
+                              }}
+                            >
+                              <Ionicons
+                                name="return-down-forward"
+                                size={14}
+                                color="#00BFA5"
+                              />
+                              <Text style={styles.proReplyBadge}>
+                                Respuesta del Profesional
+                              </Text>
+                            </View>
+                            {rev.fechaRespuesta && (
+                              <Text style={styles.proReplyDate}>
+                                {new Date(rev.fechaRespuesta).toLocaleDateString(
+                                  "es-AR",
+                                  { day: "2-digit", month: "short" }
+                                )}
+                              </Text>
+                            )}
+                          </View>
+                          <Text
+                            style={[
+                              styles.proReplyText,
+                              { color: isDark ? "#E2E8F0" : "#0F766E" },
+                            ]}
+                          >
+                            {rev.respuestaProfesional}
+                          </Text>
+                        </View>
+                      ) : isCurrentPro ? (
+                        // Vista de Réplica (Profesional)
+                        <View style={{ marginTop: 8 }}>
+                          {replyingReviewId === rev.id ? (
+                            <View style={styles.replyFormBox}>
+                              <TextInput
+                                style={[
+                                  styles.replyInput,
+                                  {
+                                    backgroundColor: isDark
+                                      ? "#0F172A"
+                                      : "#F8FAFC",
+                                    color: isDark ? "#F8FAFC" : "#1E293B",
+                                    borderColor: isDark ? "#334155" : "#E2E8F0",
+                                  },
+                                ]}
+                                placeholder="Escribe tu respuesta pública..."
+                                placeholderTextColor={
+                                  isDark ? "#64748B" : "#94A3B8"
+                                }
+                                value={replyText}
+                                onChangeText={setReplyText}
+                                multiline
+                                editable={!sendingReply}
+                              />
+                              <Text style={styles.replyWarningText}>
+                                ⚠️ Tu respuesta será única e inmutable tras ser publicada.
+                              </Text>
+                              <View style={styles.replyButtonsRow}>
+                                <TouchableOpacity
+                                  style={styles.replyCancelBtn}
+                                  onPress={() => {
+                                    setReplyingReviewId(null);
+                                    setReplyText("");
+                                  }}
+                                  disabled={sendingReply}
+                                >
+                                  <Text style={styles.replyCancelText}>
+                                    Cancelar
+                                  </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={styles.replySubmitBtn}
+                                  onPress={() => handleSendReply(rev.id)}
+                                  disabled={sendingReply}
+                                >
+                                  {sendingReply ? (
+                                    <ActivityIndicator
+                                      color="#FFFFFF"
+                                      size="small"
+                                    />
+                                  ) : (
+                                    <Text style={styles.replySubmitText}>
+                                      Enviar respuesta
+                                    </Text>
+                                  )}
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.openReplyBtn}
+                              onPress={() => {
+                                setReplyingReviewId(rev.id);
+                                setReplyText("");
+                              }}
+                            >
+                              <Ionicons
+                                name="chatbubble-ellipses-outline"
+                                size={14}
+                                color="#FF8C00"
+                              />
+                              <Text style={styles.openReplyBtnText}>
+                                Responder a este cliente
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
+          </>
+          )}
         </ScrollView>
 
         <View
@@ -552,7 +1074,7 @@ export default function ProfilePreviewModal({
             </TouchableOpacity>
           )}
 
-          {onConfirmSave && (
+          {!isCliente && onConfirmSave && (
             <TouchableOpacity
               style={[
                 styles.primaryButton,
@@ -594,8 +1116,32 @@ export default function ProfilePreviewModal({
         <SolicitudModal
           visible={solicitudVisible}
           onClose={() => setSolicitudVisible(false)}
-          profesionalId={profesionalId} // <-- Actualiza esta línea
+          profesionalId={profesionalId}
         />
+
+        {/* Modal de previsualización ampliada de fotos (Lightbox) */}
+        {expandedImage && (
+          <Modal
+            visible={!!expandedImage}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setExpandedImage(null)}
+          >
+            <View style={styles.lightboxOverlay}>
+              <TouchableOpacity
+                style={styles.lightboxCloseBtn}
+                onPress={() => setExpandedImage(null)}
+              >
+                <Ionicons name="close" size={26} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Image
+                source={{ uri: expandedImage }}
+                style={styles.lightboxImage}
+                resizeMode="contain"
+              />
+            </View>
+          </Modal>
+        )}
       </View>
     </Modal>
   );
@@ -800,10 +1346,26 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 14,
+    gap: 8,
+  },
+  reviewsHeaderLeft: {
+    flex: 1,
   },
   reviewsSubhead: {
     fontSize: 12,
+    lineHeight: 16,
     marginTop: 2,
+  },
+  ratingBigBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexShrink: 0,
+    alignSelf: "flex-start",
   },
   ratingBigRow: {
     flexDirection: "row",
@@ -811,7 +1373,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ratingBigNumber: {
-    fontSize: 22,
+    fontSize: 15,
     fontWeight: "800",
   },
   reviewItemCard: {
@@ -891,5 +1453,156 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "700",
+  },
+  emptyReviewsBox: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  emptyReviewsText: {
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  reviewerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+  },
+  reviewerAvatarFallback: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reviewerInitial: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#00BFA5",
+  },
+  reviewPhotosRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginVertical: 6,
+  },
+  reviewPhotoThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+  },
+  proReplyContainer: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: "#00BFA5",
+    borderWidth: 1,
+  },
+  proReplyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  proReplyBadge: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#00BFA5",
+  },
+  proReplyDate: {
+    fontSize: 10,
+    color: "#94A3B8",
+  },
+  proReplyText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontStyle: "italic",
+  },
+  openReplyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 140, 0, 0.1)",
+  },
+  openReplyBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FF8C00",
+  },
+  replyFormBox: {
+    gap: 8,
+    marginTop: 6,
+  },
+  replyInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    fontSize: 13,
+    minHeight: 64,
+  },
+  replyWarningText: {
+    fontSize: 10,
+    color: "#D97706",
+  },
+  replyButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  replyCancelBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  replyCancelText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  replySubmitBtn: {
+    backgroundColor: "#FF8C00",
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  replySubmitText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  lightboxOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  lightboxCloseBtn: {
+    position: "absolute",
+    top: 48,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lightboxImage: {
+    width: "100%",
+    height: "80%",
   },
 });
