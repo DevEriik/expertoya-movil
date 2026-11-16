@@ -1,73 +1,98 @@
 # Pasarela de pagos mobile — DAN-22
 
-Este documento describe la integración mobile con Mercado Pago Checkout Pro y el único punto que queda pendiente del lado backend.
+Este documento describe la integración mobile con Mercado Pago Checkout Pro y el puente de retorno automático implementado en el backend.
 
-## Flujo implementado
+---
 
-1. La pantalla `/pagos/[solicitudId]` consulta `GET /api/payments/solicitud/:solicitudId`.
-2. El cliente genera la preferencia con `POST /api/payments/preferences`.
-3. La app abre `init_point` o `sandbox_init_point` con `WebBrowser.openBrowserAsync`.
-4. Al cerrar el navegador, la app refresca el estado e inicia polling cada 3 segundos durante 30 segundos.
-5. La app también escucha el evento `pago:retenido` por Socket.io y refresca al volver a primer plano.
-6. Cliente y profesional confirman con `POST /api/payments/solicitud/:solicitudId/confirm`.
-7. Cuando ambas partes confirman, el backend libera el pago y crea el payout.
-8. El comprobante se abre desde `comprobante_url` cuando está disponible.
+## 1. Arquitectura y Flujo
 
-## Variables de entorno
+1. **Consulta inicial**: La pantalla `/pagos/[solicitudId]` consulta `GET /api/payments/solicitud/:solicitudId` (requiere token JWT de Cliente, Profesional o Admin).
+2. **Preferencia de pago**: El cliente genera la preferencia con `POST /api/payments/preferences` con `{ solicitud_id }`.
+3. **Checkout Pro**: La app abre `init_point` o `sandbox_init_point` con `WebBrowser.openBrowserAsync`.
+4. **Retorno desde Mercado Pago (Puente Backend)**:
+   - Mercado Pago redirige a `https://<APP_PUBLIC_URL>/pago/:status` (`success`, `failure`, `pending`).
+   - El backend valida `:status`, extrae el UUID de la solicitud a partir de `external_reference` (`<uuid>-<timestamp>`), y responde una página HTML segura que redirige automáticamente a:
+     ```text
+     expertoyamovil://pago/:status?solicitudId=<uuid>&solicitud_id=<uuid>&external_reference=<raw>&payment_id=<id>&mp_status=<status>
+     ```
+   - Si no hay ID válido, la app muestra un error controlado sin romperse ("No pudimos identificar la solicitud").
+5. **Recepción en Mobile (`/pago/[status].tsx`)**:
+   - Lee los parámetros con prioridad: `solicitudId` (UUID válido) -> `solicitud_id` (UUID válido) -> `external_reference` (extracción de UUID).
+   - Redirige internamente a `/pagos/[solicitudId]` activando el polling de verificación (`fromCheckout=true`).
+6. **Sincronización en tiempo real**:
+   - Webhook de Mercado Pago notifica al backend.
+   - Backend valida firma HMAC, marca el pago `RETENIDO`, genera el comprobante digital PDF y emite el evento `pago:retenido` por Socket.io a las salas `usuario_<id>` y `user:<id>`.
+   - La app escucha `pago:retenido` y actualiza la UI a `RETENIDO` en tiempo real.
+   - De respaldo, la app cuenta con:
+     - Polling cada 3 segundos durante 30 segundos (`usePaymentDetails`).
+     - Refresco automático al volver a primer plano (`AppState.addEventListener("change", ...)`).
+7. **Doble confirmación (Escrow)**:
+   - Cliente y profesional confirman con `POST /api/payments/solicitud/:solicitudId/confirm`.
+   - Cuando ambas partes confirman, el backend pasa el pago a `LIBERADO`, finaliza la solicitud y genera el payout.
+8. **Comprobante digital**:
+   - Se abre desde `comprobante_url` vía `WebBrowser.openBrowserAsync`.
+
+---
+
+## 2. Variables de entorno
 
 ```env
-EXPO_PUBLIC_API_URL=http://localhost:3000
-EXPO_PUBLIC_MP_ENV=production
+EXPO_PUBLIC_API_URL=https://<TUNEL_O_DOMINIO_BACKEND>
+EXPO_PUBLIC_MP_ENV=sandbox
 ```
 
-- Si `EXPO_PUBLIC_MP_ENV` no está definida, la app usa `sandbox_init_point`.
-- Si vale `production`, la app usa `init_point`.
+- Si `EXPO_PUBLIC_MP_ENV` vale `production`, la app usa `init_point`.
+- Si no está definida o vale `sandbox`, usa `sandbox_init_point`.
 
-## Punto pendiente: retorno automático por deep link
+---
 
-El backend configura las `back_urls` de Mercado Pago así:
+## 3. Requisito de ejecución: Development Build
 
-```text
-https://<APP_PUBLIC_URL>/pago/success
-https://<APP_PUBLIC_URL>/pago/failure
-https://<APP_PUBLIC_URL>/pago/pending
+> [!IMPORTANT]
+> El scheme personalizado `expertoyamovil://` requiere una **Development Build** de Android (`npx expo run:android` o APK generado con EAS). **Expo Go no soporta schemes personalizados** y no interceptará el deep link de retorno.
+
+Para compilar la development build:
+```bash
+# Localmente con Android Studio / adb
+npx expo run:android
+
+# O mediante EAS Build
+eas build --profile development --platform android
 ```
 
-Esas URLs son `https`, no usan el scheme mobile `expertoyamovil://`.
+---
 
-Por ese motivo, el retorno automático a la app no está garantizado únicamente con el deep link. La app cubre el caso con:
+## 4. Pruebas de Deep Link con ADB
 
-- refresco al cerrar el navegador
-- polling del estado del pago
-- evento `pago:retenido`
-- refresco al volver la app a primer plano
-
-La ruta `src/app/pago/[status].tsx` ya existe para manejar `/pago/success`, `/pago/failure` y `/pago/pending`, pero solo se activará si el backend o el dominio quedan configurados para abrir la app.
-
-Para completar el retorno automático hay dos opciones:
-
-1. Que el backend permita `back_urls` con el scheme de la app.
-2. Que `APP_PUBLIC_URL` sea un dominio con Universal Links / App Links configurados.
-
-Hasta que eso se defina, el flujo actual funciona sin asumir que el pago fue aprobado y sin depender del retorno del navegador.
-
-## Probar en desarrollo
-
-1. Instalar dependencias:
+Podés verificar la respuesta de la app ante el deep link directamente por terminal:
 
 ```bash
-npm install
+# Caso 1: Retorno exitoso
+adb shell am start -W -a android.intent.action.VIEW \
+  -d "expertoyamovil://pago/success?solicitudId=220bdc40-ee9b-43ca-a2f7-1df8b0417c9b&solicitud_id=220bdc40-ee9b-43ca-a2f7-1df8b0417c9b&external_reference=220bdc40-ee9b-43ca-a2f7-1df8b0417c9b-1731760000000&payment_id=188860478443&mp_status=approved"
+
+# Caso 2: Solo external_reference
+adb shell am start -W -a android.intent.action.VIEW \
+  -d "expertoyamovil://pago/success?external_reference=220bdc40-ee9b-43ca-a2f7-1df8b0417c9b-1731760000000&payment_id=188860478443"
+
+# Caso 3: Pago fallido o pendiente
+adb shell am start -W -a android.intent.action.VIEW \
+  -d "expertoyamovil://pago/failure?solicitudId=220bdc40-ee9b-43ca-a2f7-1df8b0417c9b&mp_status=rejected"
+
+# Caso 4: Sin ID válido (error controlado)
+adb shell am start -W -a android.intent.action.VIEW \
+  -d "expertoyamovil://pago/success"
 ```
 
-2. Definir `EXPO_PUBLIC_API_URL` apuntando al backend.
-3. Iniciar la app:
+---
 
-```bash
-npm start
-```
+## 5. Checklist de Verificación de Calidad
 
-4. Entrar a una solicitud aceptada y tocar `Gestionar pago`.
-5. Crear la preferencia y abrir el checkout.
-6. Volver a la app y verificar que el estado pase de `PENDIENTE` a `RETENIDO`.
-
-Sin credenciales reales de Mercado Pago configuradas en backend, el checkout real no funciona. En ese caso se puede probar el resto del flujo con datos de prueba o mocks.
+- [x] Contrato tipado con el backend en `src/services/payments.ts`.
+- [x] Prioridad de IDs: `solicitudId` -> `solicitud_id` -> `external_reference`.
+- [x] Pantalla de error controlado cuando falta el ID de solicitud.
+- [x] Polling automático al volver de Mercado Pago (`fromCheckout=true`).
+- [x] Recepción del evento Socket.io `pago:retenido`.
+- [x] Respaldo de actualización por `AppState`.
+- [x] `npm run lint` sin errores.
+- [x] `npx expo export --platform android` correcto.

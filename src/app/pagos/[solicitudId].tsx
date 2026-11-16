@@ -13,7 +13,7 @@ import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
 import { Ionicons } from "@expo/vector-icons";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -199,10 +199,15 @@ export default function PagoSolicitudScreen() {
 
   const params = useLocalSearchParams<{
     solicitudId?: string | string[];
+    fromCheckout?: string;
+    retornoStatus?: string;
+    mpStatus?: string;
+    paymentId?: string;
   }>();
   const solicitudId = Array.isArray(params.solicitudId)
     ? params.solicitudId[0]
     : params.solicitudId;
+  const fromCheckout = params.fromCheckout === "true";
 
   const {
     details,
@@ -214,6 +219,12 @@ export default function PagoSolicitudScreen() {
     refresh,
     startPolling,
   } = usePaymentDetails(solicitudId);
+
+  useEffect(() => {
+    if (fromCheckout && solicitudId) {
+      startPolling();
+    }
+  }, [fromCheckout, solicitudId, startPolling]);
 
   const [actionLoading, setActionLoading] = useState<
     "pago" | "confirmar" | "comprobante" | null
@@ -432,16 +443,20 @@ export default function PagoSolicitudScreen() {
             />
             <View style={styles.statusTextContainer}>
               <Text style={[styles.statusTitle, { color }]}>
-                {ui?.titulo ??
-                  (esProfesional
-                    ? "Esperando el pago del cliente"
-                    : "Pago no iniciado")}
+                {fromCheckout && (!pago || pago.estado === "PENDIENTE")
+                  ? "Verificando el pago..."
+                  : ui?.titulo ??
+                    (esProfesional
+                      ? "Esperando el pago del cliente"
+                      : "Pago no iniciado")}
               </Text>
               <Text style={[styles.statusDescription, { color: colors.text }]}>
-                {ui?.descripcion ??
-                  (esProfesional
-                    ? "El cliente todavía no generó la preferencia de pago."
-                    : "Todavía no se generó una preferencia de Mercado Pago.")}
+                {fromCheckout && (!pago || pago.estado === "PENDIENTE")
+                  ? "Esperando confirmación de Mercado Pago. El estado se actualizará automáticamente en unos segundos."
+                  : ui?.descripcion ??
+                    (esProfesional
+                      ? "El cliente todavía no generó la preferencia de pago."
+                      : "Todavía no se generó una preferencia de Mercado Pago.")}
               </Text>
             </View>
           </View>

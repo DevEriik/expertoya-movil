@@ -29,15 +29,24 @@ const TEXTO: Record<
   },
 };
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_MATCH_REGEX =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
 function primerValor(value?: string | string[]): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function extraerSolicitudId(externalReference?: string) {
+function validarUUID(id?: string): string | undefined {
+  if (!id) return undefined;
+  const trimmed = id.trim();
+  return UUID_REGEX.test(trimmed) ? trimmed : undefined;
+}
+
+function extraerSolicitudId(externalReference?: string): string | undefined {
   if (!externalReference) return undefined;
-  return externalReference.match(
-    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
-  )?.[0];
+  return externalReference.match(UUID_MATCH_REGEX)?.[0];
 }
 
 export default function PagoRetornoScreen() {
@@ -49,20 +58,35 @@ export default function PagoRetornoScreen() {
     solicitud_id?: string | string[];
     solicitudId?: string | string[];
     external_reference?: string | string[];
+    payment_id?: string | string[];
+    mp_status?: string | string[];
   }>();
 
   const estado = primerValor(params.status);
+  const rawSolicitudId = primerValor(params.solicitudId);
+  const rawSolicitud_id = primerValor(params.solicitud_id);
+  const rawExternalRef = primerValor(params.external_reference);
+  const paymentId = primerValor(params.payment_id);
+  const mpStatus = primerValor(params.mp_status);
+
+  // Prioridad según contrato: 1. solicitudId -> 2. solicitud_id -> 3. external_reference (si contiene UUID)
   const solicitudId =
-    primerValor(params.solicitud_id) ||
-    primerValor(params.solicitudId) ||
-    extraerSolicitudId(primerValor(params.external_reference));
+    validarUUID(rawSolicitudId) ||
+    validarUUID(rawSolicitud_id) ||
+    extraerSolicitudId(rawExternalRef);
 
   if (solicitudId) {
     return (
       <Redirect
         href={{
           pathname: "/pagos/[solicitudId]",
-          params: { solicitudId },
+          params: {
+            solicitudId,
+            fromCheckout: "true",
+            retornoStatus: estado ?? "pending",
+            mpStatus: mpStatus ?? "",
+            paymentId: paymentId ?? "",
+          },
         }}
       />
     );
@@ -85,17 +109,20 @@ export default function PagoRetornoScreen() {
         },
       ]}
     >
-      <Ionicons name={ui.icono} size={64} color={colors.primary} />
-      <Text style={[styles.title, { color: colors.text }]}>{ui.titulo}</Text>
+      <Ionicons name="alert-circle-outline" size={64} color={colors.warning} />
+      <Text style={[styles.title, { color: colors.text }]}>
+        No pudimos identificar la solicitud
+      </Text>
       <Text style={[styles.description, { color: colors.textSecondary }]}>
-        {ui.descripcion}
+        El retorno de Mercado Pago no incluyó un identificador de solicitud válido.
+        Podés volver a tus solicitudes para verificar el estado de tu pago.
       </Text>
       <TouchableOpacity
         style={[styles.button, { backgroundColor: colors.primary }]}
         onPress={() => router.replace("/(tabs)")}
         accessibilityRole="button"
       >
-        <Text style={styles.buttonText}>Volver al inicio</Text>
+        <Text style={styles.buttonText}>Ir a mis solicitudes</Text>
       </TouchableOpacity>
     </View>
   );
