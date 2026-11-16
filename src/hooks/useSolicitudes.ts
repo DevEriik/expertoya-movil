@@ -6,6 +6,7 @@ export type Solicitud = {
   estado:
     | "PENDIENTE"
     | "ACEPTADO"
+    | "EN_CURSO"
     | "RECHAZADO"
     | "CANCELADO"
     | "CANCELADO_AUTO";
