@@ -25,7 +25,7 @@ interface SolicitudEnviada {
   fechaTentativa: string;
   franjaHoraria: string;
   descripcion: string;
-  estado: "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "CANCELADA_AUTO";
+  estado: "PENDIENTE" | "ACEPTADO" | "EN_CURSO" | "RECHAZADA" | "RECHAZADO" | "CANCELADA_AUTO";
   createdAt: string;
 }
 
@@ -68,6 +68,12 @@ export default function MisSolicitudesScreen() {
           text: "Aceptada",
           color: "#34D399",
           icon: "checkmark-circle-outline",
+        };
+      case "EN_CURSO":
+        return {
+          text: "En curso",
+          color: "#38BDF8",
+          icon: "construct-outline",
         };
       case "RECHAZADO":
         return {
@@ -155,6 +161,20 @@ export default function MisSolicitudesScreen() {
         >
           "{item.descripcion}"
         </Text>
+
+        {(item.estado === "ACEPTADO" || item.estado === "EN_CURSO") && (
+          <TouchableOpacity
+            style={[styles.payButton, { borderColor: colors.primary }]}
+            onPress={() => router.push(`/pagos/${item._id}`)}
+            accessibilityRole="button"
+            accessibilityLabel="Gestionar el pago de esta solicitud"
+          >
+            <Ionicons name="card-outline" size={18} color={colors.primary} />
+            <Text style={[styles.payButtonText, { color: colors.primary }]}>
+              Gestionar pago
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -290,6 +310,17 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
   },
+  payButton: {
+    marginTop: 12,
+    minHeight: 42,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  payButtonText: { fontSize: 14, fontWeight: "700" },
   emptyText: {
     textAlign: "center",
     fontSize: 14,
