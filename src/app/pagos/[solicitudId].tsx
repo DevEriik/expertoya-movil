@@ -1,6 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
-import { usePaymentDetails } from "@/hooks/usePaymentDetails";
 import { useTheme } from "@/hooks/use-theme";
+import { usePaymentDetails } from "@/hooks/usePaymentDetails";
 import {
   getCheckoutUrl,
   paymentsApi,
@@ -25,6 +25,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AbrirDisputaModal from "@/components/solicitudes/AbrirDisputaModal";
 
 type Tone = "success" | "warning" | "danger" | "info" | "neutral";
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -35,19 +36,22 @@ const ESTADO_UI: Record<
 > = {
   PENDIENTE: {
     titulo: "Pago pendiente",
-    descripcion: "El checkout fue generado, pero Mercado Pago todavía no confirmó el pago.",
+    descripcion:
+      "El checkout fue generado, pero Mercado Pago todavía no confirmó el pago.",
     icono: "time-outline",
     tone: "warning",
   },
   RETENIDO: {
     titulo: "Pago retenido en garantía",
-    descripcion: "ExpertoYa retiene el dinero hasta que ambas partes confirmen la finalización.",
+    descripcion:
+      "ExpertoYa retiene el dinero hasta que ambas partes confirmen la finalización.",
     icono: "shield-checkmark-outline",
     tone: "success",
   },
   LIBERADO: {
     titulo: "Pago liberado al profesional",
-    descripcion: "El servicio fue confirmado por ambas partes y el pago ya fue liberado.",
+    descripcion:
+      "El servicio fue confirmado por ambas partes y el pago ya fue liberado.",
     icono: "checkmark-done-circle-outline",
     tone: "success",
   },
@@ -59,7 +63,8 @@ const ESTADO_UI: Record<
   },
   CANCELADO: {
     titulo: "Pago cancelado",
-    descripcion: "La preferencia de pago fue cancelada. Podés generar una nueva.",
+    descripcion:
+      "La preferencia de pago fue cancelada. Podés generar una nueva.",
     icono: "ban-outline",
     tone: "danger",
   },
@@ -77,13 +82,15 @@ const ESTADO_UI: Record<
   },
   EN_DISPUTA: {
     titulo: "Pago en disputa",
-    descripcion: "Hay una disputa abierta. La liberación está bloqueada hasta que se resuelva.",
+    descripcion:
+      "Hay una disputa abierta. La liberación está bloqueada hasta que se resuelva.",
     icono: "warning-outline",
     tone: "danger",
   },
   REVISION_MANUAL: {
     titulo: "En revisión manual",
-    descripcion: "El equipo de ExpertoYa está revisando este pago. Las acciones están bloqueadas.",
+    descripcion:
+      "El equipo de ExpertoYa está revisando este pago. Las acciones están bloqueadas.",
     icono: "search-outline",
     tone: "warning",
   },
@@ -218,6 +225,9 @@ export default function PagoSolicitudScreen() {
   const [actionLoading, setActionLoading] = useState<
     "pago" | "confirmar" | "comprobante" | null
   >(null);
+
+  const [disputaModalVisible, setDisputaModalVisible] = useState(false);
+
   const [actionError, setActionError] = useState<string | null>(null);
 
   const esCliente = isCliente(usuario?.rol);
@@ -256,6 +266,9 @@ export default function PagoSolicitudScreen() {
     pago?.estado === "RETENIDO" &&
     (esCliente || esProfesional) &&
     !yaConfirme;
+
+  const puedeIniciarReclamo =
+    esCliente && Boolean(pago) && pago?.estado === "RETENIDO" && !yaConfirme;
 
   const mostrarConfirmaciones =
     Boolean(pago) &&
@@ -311,7 +324,9 @@ export default function PagoSolicitudScreen() {
       }
     } catch (e) {
       setActionError(
-        e instanceof Error ? e.message : "No se pudo confirmar la finalización.",
+        e instanceof Error
+          ? e.message
+          : "No se pudo confirmar la finalización.",
       );
     } finally {
       setActionLoading(null);
@@ -371,7 +386,11 @@ export default function PagoSolicitudScreen() {
         </View>
       ) : error && !details ? (
         <View style={styles.center}>
-          <Ionicons name="cloud-offline-outline" size={56} color={colors.danger} />
+          <Ionicons
+            name="cloud-offline-outline"
+            size={56}
+            color={colors.danger}
+          />
           <Text style={[styles.errorTitle, { color: colors.text }]}>
             No pudimos cargar el pago
           </Text>
@@ -409,7 +428,11 @@ export default function PagoSolicitudScreen() {
                 },
               ]}
             >
-              <Ionicons name="information-circle-outline" size={20} color={colors.info} />
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color={colors.info}
+              />
               <Text style={[styles.noticeText, { color: colors.text }]}>
                 Vista de administrador: el pago es de solo lectura.
               </Text>
@@ -491,7 +514,11 @@ export default function PagoSolicitudScreen() {
                 },
               ]}
             >
-              <Ionicons name="alert-circle-outline" size={20} color={colors.danger} />
+              <Ionicons
+                name="alert-circle-outline"
+                size={20}
+                color={colors.danger}
+              />
               <Text style={[styles.noticeText, { color: colors.text }]}>
                 {actionError}
               </Text>
@@ -508,7 +535,11 @@ export default function PagoSolicitudScreen() {
                 },
               ]}
             >
-              <Ionicons name="warning-outline" size={20} color={colors.warning} />
+              <Ionicons
+                name="warning-outline"
+                size={20}
+                color={colors.warning}
+              />
               <Text style={[styles.noticeText, { color: colors.text }]}>
                 {error}
               </Text>
@@ -535,7 +566,9 @@ export default function PagoSolicitudScreen() {
             />
             {pago && (
               <>
-                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <View
+                  style={[styles.divider, { backgroundColor: colors.border }]}
+                />
                 <DetailRow
                   label="Monto total"
                   value={money(pago.monto_total)}
@@ -558,15 +591,13 @@ export default function PagoSolicitudScreen() {
                     colors={colors}
                   />
                 )}
-                <DetailRow
-                  label="Moneda"
-                  value="ARS"
-                  colors={colors}
-                />
+                <DetailRow label="Moneda" value="ARS" colors={colors} />
               </>
             )}
             {!pago && (
-              <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+              <Text
+                style={[styles.helperText, { color: colors.textSecondary }]}
+              >
                 La comisión y el neto se calculan al generar la preferencia de
                 pago.
               </Text>
@@ -575,7 +606,10 @@ export default function PagoSolicitudScreen() {
 
           {puedePagar && (
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+              style={[
+                styles.primaryButton,
+                { backgroundColor: colors.primary },
+              ]}
               onPress={handlePagar}
               disabled={actionLoading === "pago"}
               activeOpacity={0.85}
@@ -616,6 +650,7 @@ export default function PagoSolicitudScreen() {
               <Text style={[styles.cardTitle, { color: colors.text }]}>
                 Confirmación de finalización
               </Text>
+
               <ConfirmationRow
                 label="Cliente"
                 confirmed={confirmaciones.cliente}
@@ -665,6 +700,33 @@ export default function PagoSolicitudScreen() {
                 </>
               )}
 
+              {puedeIniciarReclamo && (
+                <TouchableOpacity
+                  style={[
+                    styles.secondaryButton,
+                    { borderColor: colors.danger, marginTop: 4 },
+                  ]}
+                  onPress={() => setDisputaModalVisible(true)}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Iniciar reclamo y congelar el pago"
+                >
+                  <Ionicons
+                    name="shield-half-outline"
+                    size={20}
+                    color={colors.danger}
+                  />
+                  <Text
+                    style={[
+                      styles.secondaryButtonText,
+                      { color: colors.danger },
+                    ]}
+                  >
+                    Iniciar reclamo
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               {yaConfirme && faltaOtraParte && pago?.estado === "RETENIDO" && (
                 <View
                   style={[
@@ -675,31 +737,77 @@ export default function PagoSolicitudScreen() {
                     },
                   ]}
                 >
-                  <Ionicons name="hourglass-outline" size={20} color={colors.warning} />
-                  <Text style={[styles.pendingConfirmationText, { color: colors.text }]}>
+                  <Ionicons
+                    name="hourglass-outline"
+                    size={20}
+                    color={colors.warning}
+                  />
+                  <Text
+                    style={[
+                      styles.pendingConfirmationText,
+                      { color: colors.text },
+                    ]}
+                  >
                     Ya confirmaste. Esperando la confirmación de{" "}
                     {esCliente ? "el profesional" : "el cliente"}.
                   </Text>
                 </View>
               )}
 
-              {!faltaCliente && !faltaProfesional && pago?.estado === "RETENIDO" && (
-                <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-                  Ambas partes confirmaron. Actualizá el estado para ver la
-                  liberación del pago.
-                </Text>
-              )}
+              {!faltaCliente &&
+                !faltaProfesional &&
+                pago?.estado === "RETENIDO" && (
+                  <Text
+                    style={[styles.helperText, { color: colors.textSecondary }]}
+                  >
+                    Ambas partes confirmaron. Actualizá el estado para ver la
+                    liberación del pago.
+                  </Text>
+                )}
 
               {pago?.estado === "EN_DISPUTA" && (
-                <Text style={[styles.helperText, { color: colors.danger }]}>
-                  Hay una disputa abierta. La liberación está bloqueada; si
-                  necesitás ayuda, contactá a soporte.
-                </Text>
+                <View
+                  style={[
+                    styles.pendingConfirmation,
+                    {
+                      backgroundColor: `${colors.danger}12`,
+                      borderColor: `${colors.danger}55`,
+                      marginTop: 4,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="lock-closed"
+                    size={20}
+                    color={colors.danger}
+                  />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text
+                      style={{
+                        fontSize: 13.5,
+                        fontWeight: "800",
+                        color: colors.danger,
+                      }}
+                    >
+                      Liberación congelada por reclamo
+                    </Text>
+                    <Text
+                      style={[
+                        styles.pendingConfirmationText,
+                        { color: colors.text, fontSize: 12.5 },
+                      ]}
+                    >
+                      Hay una disputa abierta en revisión. Los fondos permanecen
+                      retenidos hasta que un moderador emita una resolución.
+                    </Text>
+                  </View>
+                </View>
               )}
 
               {pago?.estado === "REVISION_MANUAL" && (
                 <Text style={[styles.helperText, { color: colors.warning }]}>
-                  El pago está en revisión manual. Las acciones están bloqueadas.
+                  El pago está en revisión manual. Las acciones están
+                  bloqueadas.
                 </Text>
               )}
             </View>
@@ -718,12 +826,13 @@ export default function PagoSolicitudScreen() {
               <Text style={[styles.cardTitle, { color: colors.text }]}>
                 {esProfesional ? "Tu payout" : "Pago al profesional"}
               </Text>
+              <DetailRow label="Estado" value={payout.estado} colors={colors} />
               <DetailRow
-                label="Estado"
-                value={payout.estado}
+                label="Monto"
+                value={money(payout.monto)}
+                strong
                 colors={colors}
               />
-              <DetailRow label="Monto" value={money(payout.monto)} strong colors={colors} />
               <DetailRow label="Método" value={payout.metodo} colors={colors} />
               {payout.pagado_en && (
                 <DetailRow
@@ -779,7 +888,9 @@ export default function PagoSolicitudScreen() {
                 )}
               </TouchableOpacity>
             ) : (
-              <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+              <Text
+                style={[styles.helperText, { color: colors.textSecondary }]}
+              >
                 El comprobante estará disponible cuando el pago sea aprobado.
               </Text>
             )}
@@ -792,6 +903,16 @@ export default function PagoSolicitudScreen() {
           </Text>
         </ScrollView>
       )}
+
+      <AbrirDisputaModal
+        visible={disputaModalVisible}
+        solicitudId={solicitudId}
+        montoRetenido={pago?.monto_total}
+        onClose={() => setDisputaModalVisible(false)}
+        onDisputaCreada={() => {
+          refresh();
+        }}
+      />
     </View>
   );
 }
