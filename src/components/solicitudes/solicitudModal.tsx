@@ -1,3 +1,4 @@
+import { useAccessibility } from "@/context/AccessibilityContext";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
@@ -30,6 +31,19 @@ export const SolicitudModal: React.FC<SolicitudModalProps> = ({
   onSubmit,
   professionalName,
 }) => {
+  const { isDarkMode: isDark } = useAccessibility();
+
+  const orangeAccent = isDark ? "#FFB74D" : "#FF8C00";
+  const orangeTextOnButton = isDark ? "#121826" : "#FFFFFF";
+  const bgModal = isDark ? "#1F2937" : "#FFFFFF";
+  const bgSurface = isDark ? "#121826" : "#FFFFFF";
+  const textMain = isDark ? "#FFFFFF" : "#111827";
+  const textMuted = isDark ? "#9CA3AF" : "#6B7280";
+  const borderCol = isDark ? "#374151" : "#E5E7EB";
+  const titleColor = isDark ? "#FFFFFF" : "#283593";
+  const hoy = new Date();
+  const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+
   const [fechaSeleccionada, setFechaSeleccionada] = useState("");
   const [franjaSeleccionada, setFranjaSeleccionada] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -37,7 +51,12 @@ export const SolicitudModal: React.FC<SolicitudModalProps> = ({
   const [successModalVisible, setSuccessModalVisible] = useState(false);
 
   const handleEnviar = () => {
-    if (!fechaSeleccionada || !franjaSeleccionada || !descripcion.trim()) {
+    if (
+      !fechaSeleccionada ||
+      fechaSeleccionada < hoyStr ||
+      !franjaSeleccionada ||
+      !descripcion.trim()
+    ) {
       setErrorModalVisible(true);
       return;
     }
@@ -49,7 +68,7 @@ export const SolicitudModal: React.FC<SolicitudModalProps> = ({
     onSubmit({
       fecha: fechaSeleccionada,
       franjaHoraria: franjaSeleccionada,
-      descripcion,
+      descripcion: descripcion.trim(),
     });
     setFechaSeleccionada("");
     setFranjaSeleccionada("");
@@ -58,16 +77,23 @@ export const SolicitudModal: React.FC<SolicitudModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={true}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={onClose}
+    >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: bgModal }]}>
           <View style={styles.headerRow}>
-            <Text style={styles.modalTitle}>Solicitar Servicio</Text>
+            <Text style={[styles.modalTitle, { color: titleColor }]}>
+              Solicitar Servicio
+            </Text>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#9CA3AF" />
+              <Ionicons name="close" size={24} color={textMuted} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, { color: textMuted }]}>
             Con profesional: {professionalName}
           </Text>
 
@@ -76,37 +102,55 @@ export const SolicitudModal: React.FC<SolicitudModalProps> = ({
             style={styles.formContainer}
           >
             {/* Calendario Interactivo */}
-            <Text style={styles.label}>Seleccioná la fecha del arreglo</Text>
+            <Text style={[styles.label, { color: orangeAccent }]}>
+              Seleccioná la fecha del arreglo
+            </Text>
             <Calendar
-              onDayPress={(day) => setFechaSeleccionada(day.dateString)}
-              markedDates={{
-                [fechaSeleccionada]: {
-                  selected: true,
-                  selectedColor: "#FFB74D",
-                },
+              key={isDark ? "dark-cal" : "light-cal"}
+              minDate={hoyStr}
+              disableAllTouchEventsForDisabledDays={true}
+              onDayPress={(day) => {
+                if (day.dateString < hoyStr) return;
+                setFechaSeleccionada(day.dateString);
               }}
+              markedDates={
+                fechaSeleccionada
+                  ? {
+                      [fechaSeleccionada]: {
+                        selected: true,
+                        selectedColor: orangeAccent,
+                        selectedTextColor: orangeTextOnButton,
+                      },
+                    }
+                  : {}
+              }
               theme={{
-                backgroundColor: "#1F2937",
-                calendarBackground: "#121826",
-                textSectionTitleColor: "#9CA3AF",
-                selectedDayBackgroundColor: "#FFB74D",
-                selectedDayTextColor: "#121826",
-                todayTextColor: "#FFB74D",
-                dayTextColor: "#FFFFFF",
-                textDisabledColor: "#374151",
-                monthTextColor: "#FFFFFF",
-                arrowColor: "#FFB74D",
+                backgroundColor: bgSurface,
+                calendarBackground: bgSurface,
+                textSectionTitleColor: textMuted,
+                selectedDayBackgroundColor: orangeAccent,
+                selectedDayTextColor: orangeTextOnButton,
+                todayTextColor: orangeAccent,
+                dayTextColor: textMain,
+                textDisabledColor: isDark ? "#374151" : "#D1D5DB",
+                monthTextColor: textMain,
+                arrowColor: orangeAccent,
               }}
-              style={styles.calendarStyle}
+              style={[
+                styles.calendarStyle,
+                { backgroundColor: bgSurface, borderColor: borderCol },
+              ]}
             />
             {fechaSeleccionada ? (
-              <Text style={styles.selectedDateText}>
+              <Text style={[styles.selectedDateText, { color: orangeAccent }]}>
                 Fecha elegida: {fechaSeleccionada}
               </Text>
             ) : null}
 
             {/* Franja Horaria */}
-            <Text style={styles.label}>Franja horaria preferida</Text>
+            <Text style={[styles.label, { color: orangeAccent }]}>
+              Franja horaria preferida
+            </Text>
             <View style={styles.franjasRow}>
               {FRANJAS_HORARIAS.map((franja) => {
                 const activo = franja === franjaSeleccionada;
@@ -116,8 +160,8 @@ export const SolicitudModal: React.FC<SolicitudModalProps> = ({
                     style={[
                       styles.franjaChip,
                       {
-                        backgroundColor: activo ? "#FFB74D" : "#121826",
-                        borderColor: activo ? "#FFB74D" : "#374151",
+                        backgroundColor: activo ? orangeAccent : bgSurface,
+                        borderColor: activo ? orangeAccent : borderCol,
                       },
                     ]}
                     onPress={() => setFranjaSeleccionada(franja)}
@@ -125,7 +169,7 @@ export const SolicitudModal: React.FC<SolicitudModalProps> = ({
                     <Text
                       style={[
                         styles.franjaText,
-                        { color: activo ? "#121826" : "#FFFFFF" },
+                        { color: activo ? orangeTextOnButton : textMain },
                       ]}
                     >
                       {franja}
@@ -136,11 +180,21 @@ export const SolicitudModal: React.FC<SolicitudModalProps> = ({
             </View>
 
             {/* Descripción */}
-            <Text style={styles.label}>Descripción de lo que necesitás</Text>
+            <Text style={[styles.label, { color: orangeAccent }]}>
+              Descripción de lo que necesitás
+            </Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[
+                styles.input,
+                styles.textArea,
+                {
+                  backgroundColor: bgSurface,
+                  borderColor: borderCol,
+                  color: textMain,
+                },
+              ]}
               placeholder="Detallá brevemente el trabajo a realizar..."
-              placeholderTextColor="#6B7280"
+              placeholderTextColor={textMuted}
               multiline
               numberOfLines={4}
               value={descripcion}
@@ -149,56 +203,79 @@ export const SolicitudModal: React.FC<SolicitudModalProps> = ({
 
             {/* Botón Enviar */}
             <TouchableOpacity
-              style={styles.submitButton}
+              style={[styles.submitButton, { backgroundColor: orangeAccent }]}
               onPress={handleEnviar}
             >
-              <Text style={styles.submitButtonText}>Enviar Solicitud</Text>
+              <Text
+                style={[styles.submitButtonText, { color: orangeTextOnButton }]}
+              >
+                Enviar Solicitud
+              </Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
       </View>
 
+      {/* Modal de Campos Incompletos */}
       <Modal
         visible={errorModalVisible}
         transparent={true}
         animationType="fade"
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.alertBox}>
-            <Ionicons name="alert-circle" size={48} color="#F87171" />
-            <Text style={styles.alertTitle}>Campos incompletos</Text>
-            <Text style={styles.alertText}>
-              Por favor seleccioná una fecha, una franja horaria y completá la
-              descripción.
+        <View style={styles.centerOverlay}>
+          <View
+            style={[
+              styles.alertBox,
+              { backgroundColor: bgModal, borderColor: borderCol },
+            ]}
+          >
+            <Ionicons name="alert-circle" size={48} color="#EF4444" />
+            <Text style={[styles.alertTitle, { color: textMain }]}>
+              Campos incompletos
+            </Text>
+            <Text style={[styles.alertText, { color: textMuted }]}>
+              Por favor seleccioná una fecha válida (desde hoy), una franja
+              horaria y completá la descripción.
             </Text>
             <TouchableOpacity
               style={styles.alertButton}
               onPress={() => setErrorModalVisible(false)}
             >
-              <Text style={styles.alertButtonText}>Entendido</Text>
+              <Text style={styles.alertButtonTextWhite}>Entendido</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      
+      {/* Modal de Confirmación */}
       <Modal
         visible={successModalVisible}
         transparent={true}
         animationType="fade"
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.alertBox}>
-            <Ionicons name="checkmark-circle" size={48} color="#34D399" />
-            <Text style={styles.alertTitle}>¡Solicitud Enviada!</Text>
-            <Text style={styles.alertText}>
+        <View style={styles.centerOverlay}>
+          <View
+            style={[
+              styles.alertBox,
+              { backgroundColor: bgModal, borderColor: borderCol },
+            ]}
+          >
+            <Ionicons name="checkmark-circle" size={48} color={orangeAccent} />
+            <Text style={[styles.alertTitle, { color: textMain }]}>
+              ¡Solicitud Enviada!
+            </Text>
+            <Text style={[styles.alertText, { color: textMuted }]}>
               Tu solicitud será aceptada o rechazada en menos de 48 horas.
             </Text>
             <TouchableOpacity
-              style={styles.successButton}
+              style={[styles.successButton, { backgroundColor: orangeAccent }]}
               onPress={handleConfirmSuccess}
             >
-              <Text style={styles.alertButtonText}>Aceptar</Text>
+              <Text
+                style={[styles.alertButtonText, { color: orangeTextOnButton }]}
+              >
+                Aceptar
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -210,11 +287,15 @@ export const SolicitudModal: React.FC<SolicitudModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     justifyContent: "flex-end",
   },
+  centerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+  },
   modalContent: {
-    backgroundColor: "#1F2937",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
@@ -229,11 +310,9 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#FDFCF4",
   },
   subtitle: {
     fontSize: 14,
-    color: "#9CA3AF",
     marginBottom: 15,
   },
   formContainer: {
@@ -241,8 +320,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#FFB74D",
+    fontWeight: "600",
     marginBottom: 8,
     marginTop: 12,
   },
@@ -250,10 +328,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#374151",
   },
   selectedDateText: {
-    color: "#34D399",
     fontSize: 13,
     marginTop: 6,
     fontWeight: "600",
@@ -276,12 +352,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   input: {
-    backgroundColor: "#121826",
     borderWidth: 1,
-    borderColor: "#374151",
     borderRadius: 12,
     padding: 12,
-    color: "#FFFFFF",
     fontSize: 14,
   },
   textArea: {
@@ -289,7 +362,6 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   submitButton: {
-    backgroundColor: "#FFB74D",
     borderRadius: 12,
     padding: 14,
     alignItems: "center",
@@ -297,29 +369,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   submitButtonText: {
-    color: "#121826",
     fontSize: 16,
     fontWeight: "700",
   },
   alertBox: {
-    backgroundColor: "#1F2937",
     marginHorizontal: 30,
     borderRadius: 20,
     padding: 24,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#374151",
   },
   alertTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#FFFFFF",
     marginTop: 12,
     marginBottom: 8,
   },
   alertText: {
     fontSize: 14,
-    color: "#9CA3AF",
     textAlign: "center",
     marginBottom: 20,
   },
@@ -330,13 +397,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   successButton: {
-    backgroundColor: "#34D399",
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 24,
   },
   alertButtonText: {
-    color: "#121826",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  alertButtonTextWhite: {
+    color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 14,
   },

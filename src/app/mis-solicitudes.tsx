@@ -1,6 +1,8 @@
+import AbrirDisputaModal from "@/components/solicitudes/AbrirDisputaModal";
 import CreateReviewModal from "@/components/solicitudes/CreateReviewModal";
 import { useTheme } from "@/hooks/use-theme";
 import { apiClient } from "@/utils/api";
+import type { DisputaData } from "@/utils/disputasApi";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -29,7 +31,24 @@ interface SolicitudEnviada {
   fechaTentativa: string;
   franjaHoraria: string;
   descripcion: string;
-  estado: "PENDIENTE" | "ACEPTADO" | "EN_CURSO" | "RECHAZADA" | "RECHAZADO" | "CANCELADA_AUTO";
+  servicio?: {
+    titulo_servicio?: string;
+  };
+  estado:
+    | "PENDIENTE"
+    | "ACEPTADO"
+    | "EN_CURSO"
+    | "RECHAZADA"
+    | "RECHAZADO"
+    | "CANCELADA_AUTO"
+    | "FINALIZADO"
+    | "FINALIZADA"
+    | "DISPUTA";
+  pagos?: {
+    id: string;
+    estado_pago: string;
+    monto_total: string | number;
+  }[];
   createdAt: string;
   pagoLiberado?: boolean;
   resena?: {
@@ -47,7 +66,10 @@ export default function MisSolicitudesScreen() {
   const insets = useSafeAreaInsets();
   const [solicitudes, setSolicitudes] = useState<SolicitudEnviada[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSolicitud, setSelectedSolicitud] = useState<SolicitudEnviada | null>(null);
+  const [solicitudDisputa, setSolicitudDisputa] =
+    useState<SolicitudEnviada | null>(null);
+  const [selectedSolicitud, setSelectedSolicitud] =
+    useState<SolicitudEnviada | null>(null);
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
 
   const fetchSolicitudes = async () => {
@@ -107,6 +129,12 @@ export default function MisSolicitudesScreen() {
           text: "Expirada (+48h sin respuesta)",
           color: "#9CA3AF",
           icon: "alert-circle-outline",
+        };
+      case "DISPUTA":
+        return {
+          text: "En disputa · Pago congelado",
+          color: "#EF4444",
+          icon: "shield-half-outline",
         };
       default:
         return { text: estado, color: "#9CA3AF", icon: "help-outline" };
@@ -237,6 +265,51 @@ export default function MisSolicitudesScreen() {
             </Text>
           </TouchableOpacity>
         )}
+
+        {(() => {
+          const ultimoPago = item.pagos?.[0];
+          const enDisputa =
+            item.estado === "DISPUTA" ||
+            ultimoPago?.estado_pago === "EN_DISPUTA";
+          const puedeReclamar =
+            !enDisputa && ultimoPago?.estado_pago === "RETENIDO";
+
+          if (enDisputa) {
+            return (
+              <View style={styles.disputaBanner}>
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={16}
+                  color="#FCA5A5"
+                />
+                <Text style={styles.disputaBannerText}>
+                  Transacción congelada por reclamo. Soporte está revisando el
+                  caso.
+                </Text>
+              </View>
+            );
+          }
+
+          if (puedeReclamar) {
+            return (
+              <TouchableOpacity
+                style={styles.reclamoBtn}
+                onPress={() => setSolicitudDisputa(item)}
+                accessibilityRole="button"
+                accessibilityLabel="Iniciar reclamo sobre este servicio"
+              >
+                <Ionicons
+                  name="shield-half-outline"
+                  size={16}
+                  color="#FCA5A5"
+                />
+                <Text style={styles.reclamoBtnText}>Iniciar reclamo</Text>
+              </TouchableOpacity>
+            );
+          }
+
+          return null;
+        })()}
       </View>
     );
   };
@@ -251,7 +324,6 @@ export default function MisSolicitudesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-
       <View
         style={[
           styles.headerBar,
@@ -262,7 +334,6 @@ export default function MisSolicitudesScreen() {
           },
         ]}
       >
-
         <TouchableOpacity
           onPress={() => {
             if (router.canGoBack()) {
@@ -276,15 +347,12 @@ export default function MisSolicitudesScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
-
         <Text style={[styles.headerTitleText, { color: colors.text }]}>
           Historial de Solicitudes
         </Text>
 
-
         <View style={{ width: 24 }} />
       </View>
-
 
       {solicitudes.length === 0 ? (
         <View style={styles.center}>
@@ -328,13 +396,35 @@ export default function MisSolicitudesScreen() {
           }}
         />
       )}
+      <AbrirDisputaModal
+        visible={solicitudDisputa !== null}
+        solicitudId={solicitudDisputa?._id || null}
+        montoRetenido={solicitudDisputa?.pagos?.[0]?.monto_total}
+        onClose={() => setSolicitudDisputa(null)}
+        onDisputaCreada={(_disputa: DisputaData) => {
+          const targetId = solicitudDisputa?._id;
+          setSolicitudes((prev) =>
+            prev.map((sol) =>
+              sol._id === targetId
+                ? {
+                    ...sol,
+                    estado: "DISPUTA",
+                    pagos: sol.pagos?.map((p, idx) =>
+                      idx === 0 ? { ...p, estado_pago: "EN_DISPUTA" } : p,
+                    ),
+                  }
+                : sol,
+            ),
+          );
+          fetchSolicitudes();
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
 
   headerBar: {
     flexDirection: "row",
@@ -468,5 +558,41 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "800",
+  },
+  reclamoBtn: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#EF4444",
+    backgroundColor: "#EF44441A",
+  },
+  reclamoBtnText: {
+    color: "#EF4444",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  disputaBanner: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#EF444466",
+    backgroundColor: "#EF444418",
+  },
+  disputaBannerText: {
+    flex: 1,
+    color: "#FCA5A5",
+    fontSize: 12.5,
+    fontWeight: "600",
+    lineHeight: 17,
   },
 });
