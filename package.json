@@ -54,8 +54,8 @@
   "scripts": {
     "start": "react-native start",
     "android": "react-native run-android",
-    "build:apk": "cd android && ./gradlew assembleRelease",
-    "build:aab": "cd android && ./gradlew bundleRelease",
+    "build:apk": "cd android && gradlew assembleRelease",
+    "build:aab": "cd android && gradlew bundleRelease",
     "web": "vite",
     "build:web": "vite build",
     "lint": "tsc --noEmit"
