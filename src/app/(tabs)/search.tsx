@@ -8,8 +8,8 @@ import { ServicioPublicadoItem } from "@/types/service";
 import { apiClient } from "@/utils/api";
 import { COVERAGE_MESSAGE, isInCoverageZone } from "@/utils/geoZone";
 import { getPublicServicesByProfessionalId } from "@/utils/servicesStorage";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useRouter } from '@/navigation/routerCompat';
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,

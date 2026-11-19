@@ -7,8 +7,8 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useRouter } from '@/navigation/routerCompat';
 import { useAuth } from '@/context/AuthContext';
 import type { ChatSession, UserRole } from '../../types/chat';
 import { ChatStatusBadge } from './ChatStatusBadge';

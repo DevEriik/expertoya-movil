@@ -1,5 +1,5 @@
 import { useAccessibility } from "@/context/AccessibilityContext";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from '@/components/ui/VectorIcons';
 import React, { useState } from "react";
 import {
   Modal,

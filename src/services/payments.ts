@@ -1,3 +1,4 @@
+import Config from "react-native-config";
 import { apiClient } from "@/utils/api";
 
 export type EstadoPago =
@@ -161,7 +162,7 @@ export function getCheckoutUrl(preferencia: PreferenciaPago): string {
     throw new Error("Solo se aceptan pagos en ARS.");
   }
 
-  const usarProduccion = process.env.EXPO_PUBLIC_MP_ENV === "production";
+  const usarProduccion = Config.MP_ENV === "production";
 
   return usarProduccion
     ? preferencia.init_point

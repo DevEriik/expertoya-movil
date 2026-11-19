@@ -12,8 +12,8 @@ import {
   MAX_ACTIVE_SERVICES,
   toggleServiceStatus,
 } from "@/utils/servicesStorage";
-import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useFocusEffect, useRouter } from '@/navigation/routerCompat';
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,

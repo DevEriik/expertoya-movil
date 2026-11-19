@@ -1,5 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useRouter } from '@/navigation/routerCompat';
 import React, { useState } from "react";
 import {
   ActivityIndicator,

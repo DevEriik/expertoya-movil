@@ -10,7 +10,7 @@ import {
   Platform,
   Vibration,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@/components/ui/VectorIcons';
 import type { VideoCallInvitation } from '@/types/chat';
 
 const FONT_SANS_BOLD = Platform.select({
@@ -78,7 +78,7 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
       if (!visible) return;
 
       try {
-        const { createAudioPlayer } = require('expo-audio');
+        const { createAudioPlayer } = require('@/utils/audioCompat');
         if (createAudioPlayer) {
           const player = createAudioPlayer({ uri: RINGTONE_FALLBACK_URI });
           player.loop = true;

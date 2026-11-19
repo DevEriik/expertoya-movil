@@ -2,8 +2,8 @@ import { AdminNotice } from "@/components/AdminNotice";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useRouter } from '@/navigation/routerCompat';
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,

@@ -1,4 +1,5 @@
-import * as ImagePicker from "expo-image-picker";
+import { ImagePicker } from '@/utils/mediaPicker';
+import { API_URL as BASE_API_URL } from '@/utils/api';
 import { useEffect, useState } from "react";
 import { Alert, Platform } from "react-native";
 
@@ -115,7 +116,7 @@ export const useDiagnosticoIA = () => {
     setIsLoading(true);
     setOficios([]);
 
-    const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+    const API_BASE = BASE_API_URL;
     const API_URL = `${API_BASE}/api/ia/diagnostico-visual`;
 
     try {

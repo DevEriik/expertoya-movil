@@ -10,13 +10,13 @@ import {
   type Payout,
 } from "@/services/payments";
 import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
-import { Ionicons } from "@expo/vector-icons";
-import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { Redirect, useLocalSearchParams, useRouter } from '@/navigation/routerCompat';
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -298,7 +298,7 @@ export default function PagoSolicitudScreen() {
       const { preferencia } = await paymentsApi.createPreference(solicitudId);
       const checkoutUrl = getCheckoutUrl(preferencia);
 
-      await WebBrowser.openBrowserAsync(checkoutUrl);
+      await Linking.openURL(checkoutUrl);
       await refresh();
       startPolling();
     } catch (e) {
@@ -349,7 +349,7 @@ export default function PagoSolicitudScreen() {
     setActionError(null);
     setActionLoading("comprobante");
     try {
-      await WebBrowser.openBrowserAsync(details.comprobante_url);
+      await Linking.openURL(details.comprobante_url);
     } catch (e) {
       setActionError(
         e instanceof Error ? e.message : "No se pudo abrir el comprobante.",

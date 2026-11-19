@@ -1,5 +1,5 @@
 import type { Solicitud } from "@/hooks/useSolicitudes";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from '@/components/ui/VectorIcons';
 
 export type IconName = keyof typeof Ionicons.glyphMap;
 

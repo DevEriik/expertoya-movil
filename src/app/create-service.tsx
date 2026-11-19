@@ -13,10 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
-import * as ImagePicker from "expo-image-picker";
+import { useLocalSearchParams, useRouter } from '@/navigation/routerCompat';
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { ImagePicker } from '@/utils/mediaPicker';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "@/hooks/use-theme";
@@ -524,7 +523,16 @@ export default function CreateServiceModal() {
   };
 
   return (
-    <BlurView intensity={90} tint={isDark ? "dark" : "light"} style={styles.overlay}>
+    <View
+      style={[
+        styles.overlay,
+        {
+          backgroundColor: isDark
+            ? "rgba(15, 23, 42, 0.9)"
+            : "rgba(255, 255, 255, 0.92)",
+        },
+      ]}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -1712,7 +1720,7 @@ export default function CreateServiceModal() {
         onCancel={() => setShowDeleteModal(false)}
         onConfirm={handleConfirmDelete}
       />
-    </BlurView>
+    </View>
   );
 }
 

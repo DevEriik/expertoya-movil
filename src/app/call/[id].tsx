@@ -11,8 +11,8 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from '@/navigation/routerCompat';
+import { Ionicons } from '@/components/ui/VectorIcons';
 import { useVideoCall } from '@/hooks/useVideoCall';
 import { useAuth } from '@/context/AuthContext';
 import { io } from 'socket.io-client';

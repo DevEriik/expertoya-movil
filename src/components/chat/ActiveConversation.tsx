@@ -15,8 +15,8 @@ import {
   Modal,
   Linking,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useRouter } from '@/navigation/routerCompat';
 import { IncomingCallModal } from './IncomingCallModal';
 import { OutgoingCallModal } from './OutgoingCallModal';
 import { useAccessibility } from '@/context/AccessibilityContext';
@@ -326,21 +326,16 @@ export const ActiveConversation: React.FC<Props> = ({
           setSegundosGrabacion((prev) => prev + 1);
         }, 1000);
       } else {
-        const { AudioModule, requestRecordingPermissionsAsync } = require('expo-audio');
+        const { NativeAudioRecorder, requestRecordingPermissionsAsync } = require('@/utils/audioCompat');
         const perm = await requestRecordingPermissionsAsync();
         if (!perm.granted) {
           Alert.alert('Permiso requerido', 'Se requiere acceso al micrófono para grabar notas de voz.');
           return;
         }
 
-        const recorder = new AudioModule.AudioRecorder({
-          extension: '.m4a',
-          sampleRate: 44100,
-          numberOfChannels: 1,
-          bitRate: 128000,
-        });
+        const recorder = new NativeAudioRecorder();
         await recorder.prepareToRecordAsync();
-        recorder.record();
+        await recorder.record();
         nativeRecorderRef.current = recorder;
 
         setGrabandoAudio(true);

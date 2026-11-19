@@ -7,8 +7,8 @@ import {
   StyleSheet,
   Image,
 } from "react-native";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
+import { MaterialCommunityIcons, Ionicons } from '@/components/ui/VectorIcons';
+import { ImagePicker } from "@/utils/mediaPicker";
 
 interface Props {
   busqueda: string;

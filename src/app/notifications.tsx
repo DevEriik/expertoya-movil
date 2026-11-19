@@ -17,8 +17,8 @@ import {
   registerPushToken,
 } from "@/utils/pushNotifications";
 import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
-import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useFocusEffect, useRouter } from '@/navigation/routerCompat';
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,

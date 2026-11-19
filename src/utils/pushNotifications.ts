@@ -1,86 +1,73 @@
-import Constants from "expo-constants";
-import * as Notifications from "@/utils/safeNotifications";
-import { Platform } from "react-native";
-import { apiClient } from "./api";
+import { getMessaging, getToken } from '@react-native-firebase/messaging';
+import { Platform } from 'react-native';
+import { apiClient } from './api';
 import {
   getNotificationPermissionInfo,
   setupNotificationChannels,
-} from "./notifications";
-
-const PROJECT_ID = Constants.expoConfig?.extra?.eas?.projectId as
-  | string
-  | undefined;
+} from './notifications';
 
 let lastRegisteredToken: string | null = null;
 let registrationInFlight: Promise<string | null> | null = null;
 
 function getPlataforma(): string {
-  if (Platform.OS === "ios") return "IOS";
-  if (Platform.OS === "android") return "ANDROID";
-  return "WEB";
+  if (Platform.OS === 'ios') return 'IOS';
+  if (Platform.OS === 'android') return 'ANDROID';
+  return 'WEB';
 }
 
 async function doRegister(force: boolean): Promise<string | null> {
-  if (Platform.OS === "web") return null;
-
-  // En Expo Go, las notificaciones remotas no están disponibles por diseño de Expo SDK 52+
-  if (Constants.appOwnership === "expo") {
-    return null;
-  }
+  if (Platform.OS === 'web') return null;
 
   await setupNotificationChannels();
 
   const permission = await getNotificationPermissionInfo();
-  if (permission.state !== "granted") {
+  if (permission.state !== 'granted') {
     return null;
   }
 
-  let expoToken: string | null = null;
+  let fcmToken: string | null = null;
   try {
-    const res = await Notifications.getExpoPushTokenAsync(
-      PROJECT_ID ? { projectId: PROJECT_ID } : undefined,
-    );
-    expoToken = res?.data || null;
+    fcmToken = await getToken(getMessaging());
   } catch (error) {
     if (__DEV__) {
       console.warn(
-        "Aviso: Push notifications no disponibles en el entorno actual (Expo Go). Usa una build de desarrollo para probar notificaciones remotas.",
+        'Aviso: No se pudo obtener el token FCM (verifica google-services.json en android/app/):',
         error,
       );
     }
     return null;
   }
 
-  if (!expoToken) {
+  if (!fcmToken) {
     return null;
   }
 
-  if (!force && expoToken === lastRegisteredToken) {
-    return expoToken;
+  if (!force && fcmToken === lastRegisteredToken) {
+    return fcmToken;
   }
 
-  const response = await apiClient("/api/notificaciones/token", {
-    method: "POST",
+  const response = await apiClient('/api/notificaciones/token', {
+    method: 'POST',
     body: JSON.stringify({
-      token: expoToken,
+      token: fcmToken,
       plataforma: getPlataforma(),
     }),
   });
 
   if (!response.ok) {
-    const detalle = await response.text().catch(() => "");
+    const detalle = await response.text().catch(() => '');
     throw new Error(
       `No se pudo registrar el token push (${response.status}): ${detalle}`,
     );
   }
 
-  lastRegisteredToken = expoToken;
+  lastRegisteredToken = fcmToken;
 
   if (__DEV__) {
-    console.log("Token push registrado:", expoToken);
+    console.log('Token FCM registrado:', fcmToken);
   }
 
-  return expoToken;
+  return fcmToken;
 }
 
 export function registerPushToken(
@@ -104,27 +91,24 @@ export function describirErrorPush(error: unknown): string {
 
   const estado = mensaje.match(/\((\d{3})\)/)?.[1];
 
-  if (estado === "401" || estado === "403") {
-    return "Tu sesión expiró. Volvé a iniciar sesión.";
+  if (estado === '401' || estado === '403') {
+    return 'Tu sesión expiró. Volvé a iniciar sesión.';
   }
-  if (estado === "400") {
-    return "El servidor rechazó el token de este dispositivo.";
+  if (estado === '400') {
+    return 'El servidor rechazó el token FCM de este dispositivo.';
   }
-  if (estado?.startsWith("5")) {
-    return "El servidor no pudo registrar el dispositivo. Intentá más tarde.";
-  }
-  if (/projectId/i.test(mensaje)) {
-    return "Falta el projectId de EAS en la configuración.";
+  if (estado?.startsWith('5')) {
+    return 'El servidor no pudo registrar el dispositivo. Intentá más tarde.';
   }
   if (/google-services|FirebaseApp|FCM|firebase/i.test(mensaje)) {
-    return "Este build no tiene Firebase configurado.";
+    return 'Este build no tiene Firebase configurado (falta google-services.json).';
   }
   if (/network|fetch|timeout|connect/i.test(mensaje)) {
-    return "No hay conexión con el servidor. Revisá tu red.";
+    return 'No hay conexión con el servidor. Revisá tu red.';
   }
   if (/permission|permiso|denied/i.test(mensaje)) {
-    return "El permiso de notificaciones no está concedido.";
+    return 'El permiso de notificaciones no está concedido.';
   }
 
-  return "No se pudo registrar este dispositivo para notificaciones.";
+  return 'No se pudo registrar este dispositivo para notificaciones.';
 }

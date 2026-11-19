@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@/components/ui/VectorIcons';
 
 interface Props {
   audioUrl: string;
@@ -75,7 +75,7 @@ export const VoiceNotePlayer: React.FC<Props> = ({
       let isMounted = true;
       (async () => {
         try {
-          const { createAudioPlayer } = require('expo-audio');
+          const { createAudioPlayer } = require('@/utils/audioCompat');
           if (createAudioPlayer) {
             const player = createAudioPlayer({ uri: audioUrl });
             nativePlayerRef.current = player;

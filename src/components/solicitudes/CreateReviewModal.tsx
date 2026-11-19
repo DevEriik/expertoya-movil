@@ -2,8 +2,8 @@ import { useAccessibility } from "@/context/AccessibilityContext";
 import { useTheme } from "@/hooks/use-theme";
 import { apiClient } from "@/utils/api";
 import { createFormDataFile } from "@/utils/fileUpload";
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { ImagePicker } from "@/utils/mediaPicker";
 import React, { useState } from "react";
 import {
   ActivityIndicator,

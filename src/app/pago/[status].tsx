@@ -1,6 +1,6 @@
 import { useTheme } from "@/hooks/use-theme";
-import { Ionicons } from "@expo/vector-icons";
-import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { Redirect, useLocalSearchParams, useRouter } from '@/navigation/routerCompat';
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 

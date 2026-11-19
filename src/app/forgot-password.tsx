@@ -11,10 +11,10 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams } from '@/navigation/routerCompat';
 import { useTheme } from '@/hooks/use-theme';
 import { useAccessibility } from '@/context/AccessibilityContext';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@/components/ui/VectorIcons';
 import { apiClient } from '@/utils/api';
 import { Logo } from '@/components/Logo';
 

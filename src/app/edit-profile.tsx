@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from '@/navigation/routerCompat';
 import { useCallback, useMemo, useState } from "react";
 
 import {
@@ -16,12 +16,11 @@ import {
   View,
 } from "react-native";
 
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from '@/components/ui/VectorIcons';
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
-import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
+import { DocumentPicker, ImagePicker } from "@/utils/mediaPicker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ProfilePreviewModal from "@/components/ProfilePreviewModal";

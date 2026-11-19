@@ -1,4 +1,4 @@
-import { Redirect, useLocalSearchParams } from "expo-router";
+import { Redirect, useLocalSearchParams } from '@/navigation/routerCompat';
 
 export default function ChatDeepLinkScreen() {
   const params = useLocalSearchParams<{ solicitudId?: string | string[] }>();

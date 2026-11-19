@@ -2,8 +2,8 @@ import { useAccessibility } from "@/context/AccessibilityContext";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/use-theme";
 import { getRoleLabel, isAdmin } from "@/utils/roles";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useRouter } from '@/navigation/routerCompat';
 import {
   ScrollView,
   StyleSheet,

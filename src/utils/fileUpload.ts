@@ -1,14 +1,11 @@
-import { Platform } from 'react-native';
-
 /**
  * Prepara una parte de archivo válida para FormData compatible con el runtime
- * moderno de Fetch (WinterCG) en React Native y Web, evitando el error
- * "Unsupported FormDataPart implementation".
+ * de Fetch en React Native y Web.
  */
 export async function createFormDataFile(
   uriOrBlob: any,
   fileName: string,
-  mimeType: string
+  mimeType: string,
 ): Promise<Blob | any> {
   if (uriOrBlob instanceof Blob) {
     return uriOrBlob;
@@ -24,15 +21,8 @@ export async function createFormDataFile(
     const blob = await res.blob();
     return blob;
   } catch (err) {
-    console.warn('[createFormDataFile] Fallback de fetch a Blob:', err);
+    console.warn('[createFormDataFile] Fallback a objeto FormData RN:', err);
   }
-
-  try {
-    const { File } = require('expo-file-system');
-    if (File) {
-      return new File(uri);
-    }
-  } catch (_) {}
 
   return {
     uri,
@@ -40,4 +30,3 @@ export async function createFormDataFile(
     type: mimeType,
   };
 }
-
