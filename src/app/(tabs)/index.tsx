@@ -8,7 +8,7 @@ import {
   ScrollView,
   RefreshControl
 } from "react-native";
-import { Link } from "expo-router";
+import { Link } from '@/navigation/routerCompat';
 import { useTheme } from "@/hooks/use-theme";
 import { useAccessibility } from "@/context/AccessibilityContext";
 import { Logo } from "@/components/Logo";

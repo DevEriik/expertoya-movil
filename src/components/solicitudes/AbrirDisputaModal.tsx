@@ -1,7 +1,7 @@
 import { paleta } from "@/components/solicitudes/ui";
 import { useAccessibility } from "@/context/AccessibilityContext";
 import { abrirDisputaApi, type DisputaData } from "@/utils/disputasApi";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from '@/components/ui/VectorIcons';
 import { useState } from "react";
 import {
   ActivityIndicator,

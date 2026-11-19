@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from '@/navigation/routerCompat';
 import { useTheme } from '@/hooks/use-theme';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import type { ChatSession, UserRole } from '@/types/chat';

@@ -1,105 +1,223 @@
-import { Platform } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
+import notifee, {
+  AndroidImportance as NotifeeImportance,
+  AuthorizationStatus,
+  EventType,
+} from '@notifee/react-native';
 
-let ExpoNotifications: any = {};
-try {
-  ExpoNotifications = require('expo-notifications');
-} catch (error) {
-  console.warn('[safeNotifications] expo-notifications no está disponible nativamente en este cliente (Expo Go):', error);
-}
-
-export const setNotificationHandler =
-  ExpoNotifications.setNotificationHandler ||
-  (() => {});
-
-export const addNotificationResponseReceivedListener =
-  ExpoNotifications.addNotificationResponseReceivedListener ||
-  (() => ({ remove: () => {} }));
-
-export const getLastNotificationResponseAsync =
-  ExpoNotifications.getLastNotificationResponseAsync ||
-  (async () => null);
-
-export const clearLastNotificationResponseAsync =
-  ExpoNotifications.clearLastNotificationResponseAsync ||
-  (async () => {});
-
-export const addNotificationReceivedListener =
-  ExpoNotifications.addNotificationReceivedListener ||
-  (() => ({ remove: () => {} }));
-
-export const addPushTokenListener =
-  ExpoNotifications.addPushTokenListener ||
-  (() => ({ remove: () => {} }));
-
-export const getExpoPushTokenAsync =
-  ExpoNotifications.getExpoPushTokenAsync ||
-  (async () => null);
-
-export const setBadgeCountAsync =
-  ExpoNotifications.setBadgeCountAsync ||
-  (async () => false);
-
-export const getBadgeCountAsync =
-  ExpoNotifications.getBadgeCountAsync ||
-  (async () => 0);
-
-export const dismissAllNotificationsAsync =
-  ExpoNotifications.dismissAllNotificationsAsync ||
-  (async () => {});
-
-export const dismissNotificationAsync =
-  ExpoNotifications.dismissNotificationAsync ||
-  (async () => {});
-
-export const setNotificationChannelAsync =
-  ExpoNotifications.setNotificationChannelAsync ||
-  (async () => null);
-
-export const getNotificationChannelsAsync =
-  ExpoNotifications.getNotificationChannelsAsync ||
-  (async () => []);
-
-export const getPermissionsAsync =
-  ExpoNotifications.getPermissionsAsync ||
-  (async () => ({
-    status: 'granted',
-    granted: true,
-    canAskAgain: true,
-    expires: 'never',
-  }));
-
-export const requestPermissionsAsync =
-  ExpoNotifications.requestPermissionsAsync ||
-  (async () => ({
-    status: 'granted',
-    granted: true,
-    canAskAgain: true,
-    expires: 'never',
-  }));
-
-export const AndroidImportance = ExpoNotifications.AndroidImportance || {
+export const AndroidImportance = {
   UNKNOWN: 0,
   UNSPECIFIED: -1000,
-  NONE: 0,
-  MIN: 1,
-  LOW: 2,
-  DEFAULT: 3,
-  HIGH: 4,
-  MAX: 5,
+  NONE: NotifeeImportance.NONE,
+  MIN: NotifeeImportance.MIN,
+  LOW: NotifeeImportance.LOW,
+  DEFAULT: NotifeeImportance.DEFAULT,
+  HIGH: NotifeeImportance.HIGH,
+  MAX: NotifeeImportance.HIGH,
 };
 
-export const IosAuthorizationStatus = ExpoNotifications.IosAuthorizationStatus || {
-  NOT_DETERMINED: 0,
-  DENIED: 1,
-  AUTHORIZED: 2,
-  PROVISIONAL: 3,
-  EPHEMERAL: 4,
+export const IosAuthorizationStatus = {
+  NOT_DETERMINED: AuthorizationStatus.NOT_DETERMINED,
+  DENIED: AuthorizationStatus.DENIED,
+  AUTHORIZED: AuthorizationStatus.AUTHORIZED,
+  PROVISIONAL: AuthorizationStatus.PROVISIONAL,
+  EPHEMERAL: AuthorizationStatus.AUTHORIZED,
 };
 
-export type NotificationPermissionsStatus = any;
+export type NotificationPermissionsStatus = {
+  status: 'granted' | 'denied' | 'undetermined';
+  granted: boolean;
+  canAskAgain: boolean;
+  ios?: { status: number };
+};
 export type Subscription = { remove: () => void };
-export type NotificationResponse = any;
+export type NotificationResponse = {
+  notification: {
+    request: {
+      identifier: string;
+      content: { data?: Record<string, unknown> };
+    };
+  };
+};
 export type Notification = any;
-export type NotificationChannel = any;
+export type NotificationChannel = { id: string; name?: string };
 
-export default ExpoNotifications;
+export const setNotificationHandler = (_handler?: any) => {
+  // Notifee muestra notificaciones en foreground explícitamente vía displayNotification
+};
+
+export const addNotificationResponseReceivedListener = (
+  listener: (response: NotificationResponse) => void,
+): Subscription => {
+  if (Platform.OS === 'web') return { remove: () => {} };
+  const unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
+    if (type === EventType.PRESS && detail.notification) {
+      listener({
+        notification: {
+          request: {
+            identifier: detail.notification.id || String(Date.now()),
+            content: { data: detail.notification.data || {} },
+          },
+        },
+      });
+    }
+  });
+  return { remove: unsubscribe };
+};
+
+export const getLastNotificationResponseAsync = async (): Promise<NotificationResponse | null> => {
+  if (Platform.OS === 'web') return null;
+  try {
+    const initial = await notifee.getInitialNotification();
+    if (!initial?.notification) return null;
+    return {
+      notification: {
+        request: {
+          identifier: initial.notification.id || String(Date.now()),
+          content: { data: initial.notification.data || {} },
+        },
+      },
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const clearLastNotificationResponseAsync = async () => {};
+
+export const addNotificationReceivedListener = (
+  _listener: (notification: any) => void,
+): Subscription => {
+  return { remove: () => {} };
+};
+
+export const addPushTokenListener = (
+  listener: (token: { data: string; type: string }) => void,
+): Subscription => {
+  if (Platform.OS === 'web') return { remove: () => {} };
+  try {
+    const messaging = require('@react-native-firebase/messaging').default;
+    const unsubscribe = messaging().onTokenRefresh((token: string) => {
+      listener({ data: token, type: 'fcm' });
+    });
+    return { remove: unsubscribe };
+  } catch {
+    return { remove: () => {} };
+  }
+};
+
+export const setBadgeCountAsync = async (count: number): Promise<boolean> => {
+  if (Platform.OS === 'web') return false;
+  try {
+    await notifee.setBadgeCount(count);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const getBadgeCountAsync = async (): Promise<number> => {
+  if (Platform.OS === 'web') return 0;
+  try {
+    return await notifee.getBadgeCount();
+  } catch {
+    return 0;
+  }
+};
+
+export const dismissAllNotificationsAsync = async () => {
+  if (Platform.OS === 'web') return;
+  await notifee.cancelAllNotifications();
+};
+
+export const dismissNotificationAsync = async (id: string) => {
+  if (Platform.OS === 'web') return;
+  await notifee.cancelNotification(id);
+};
+
+export const setNotificationChannelAsync = async (
+  id: string,
+  channel: {
+    name: string;
+    importance: number;
+    vibrationPattern?: number[];
+    lightColor?: string;
+    sound?: string | null;
+    enableVibrate?: boolean;
+    showBadge?: boolean;
+  },
+) => {
+  if (Platform.OS !== 'android') return null;
+  return notifee.createChannel({
+    id,
+    name: channel.name,
+    importance: channel.importance as NotifeeImportance,
+    vibration: channel.enableVibrate ?? true,
+    vibrationPattern: channel.vibrationPattern,
+    lights: !!channel.lightColor,
+    lightColor: channel.lightColor,
+    sound: channel.sound === null ? undefined : channel.sound || 'default',
+    badge: channel.showBadge ?? true,
+  });
+};
+
+export const getNotificationChannelsAsync = async (): Promise<NotificationChannel[]> => {
+  if (Platform.OS !== 'android') return [];
+  const channels = await notifee.getChannels();
+  return channels.map((c) => ({ id: c.id, name: c.name }));
+};
+
+export const getPermissionsAsync = async (): Promise<NotificationPermissionsStatus> => {
+  if (Platform.OS === 'web') {
+    return { status: 'denied', granted: false, canAskAgain: false };
+  }
+  if (Platform.OS === 'android' && Platform.Version >= 33) {
+    const granted = await PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+    );
+    return {
+      status: granted ? 'granted' : 'undetermined',
+      granted,
+      canAskAgain: true,
+    };
+  }
+  const settings = await notifee.getNotificationSettings();
+  const granted =
+    settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
+    settings.authorizationStatus === AuthorizationStatus.PROVISIONAL;
+  return {
+    status: granted ? 'granted' : 'denied',
+    granted,
+    canAskAgain: settings.authorizationStatus !== AuthorizationStatus.DENIED,
+    ios: { status: settings.authorizationStatus },
+  };
+};
+
+export const requestPermissionsAsync = async (
+  _opts?: any,
+): Promise<NotificationPermissionsStatus> => {
+  if (Platform.OS === 'web') {
+    return { status: 'denied', granted: false, canAskAgain: false };
+  }
+  if (Platform.OS === 'android' && Platform.Version >= 33) {
+    const res = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+    );
+    const granted = res === PermissionsAndroid.RESULTS.GRANTED;
+    return {
+      status: granted ? 'granted' : 'denied',
+      granted,
+      canAskAgain: res !== PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN,
+    };
+  }
+  const settings = await notifee.requestPermission();
+  const granted =
+    settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
+    settings.authorizationStatus === AuthorizationStatus.PROVISIONAL;
+  return {
+    status: granted ? 'granted' : 'denied',
+    granted,
+    canAskAgain: settings.authorizationStatus !== AuthorizationStatus.DENIED,
+    ios: { status: settings.authorizationStatus },
+  };
+};

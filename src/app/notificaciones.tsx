@@ -3,8 +3,8 @@ import { useTheme } from "@/hooks/use-theme";
 import { apiClient } from "@/utils/api";
 import { clearBadge, syncBadgeCount } from "@/utils/badge";
 import { resolverRutaNotificacion } from "@/utils/notificationRouting";
-import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useFocusEffect, useRouter } from '@/navigation/routerCompat';
 import { useCallback, useState, type ComponentProps } from "react";
 import {
   ActivityIndicator,

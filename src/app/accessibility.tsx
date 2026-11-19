@@ -1,6 +1,6 @@
 import { useAccessibility, TextSize } from "@/context/AccessibilityContext";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useRouter } from '@/navigation/routerCompat';
 import React, { useEffect, useRef } from "react";
 import {
   Animated,

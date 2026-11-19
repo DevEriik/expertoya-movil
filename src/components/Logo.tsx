@@ -1,6 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
-import { Image } from 'expo-image';
+import { Image, StyleSheet, View, ViewStyle } from 'react-native';
 import { useAccessibility } from '@/context/AccessibilityContext';
 
 const logoLight = require('@/assets/images/logos/logo-expertoya-light.svg');
@@ -20,7 +19,7 @@ export const Logo: React.FC<LogoProps> = ({ width = 180, height = 40, style }) =
       <Image
         source={isDark ? logoDark : logoLight}
         style={styles.image}
-        contentFit="contain"
+        resizeMode="contain"
       />
     </View>
   );

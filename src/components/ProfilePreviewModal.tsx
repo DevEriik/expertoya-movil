@@ -6,7 +6,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { ServicioPublicadoItem } from "@/types/service";
 import { apiClient } from "@/utils/api";
 import { getServices } from "@/utils/servicesStorage";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from '@/components/ui/VectorIcons';
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,

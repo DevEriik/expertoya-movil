@@ -9,7 +9,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from '@/components/ui/VectorIcons';
 import { useAccessibility } from "@/context/AccessibilityContext";
 
 const FONT_FAMILY = Platform.select({

@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@/components/ui/VectorIcons';
 import type { Participant } from '@/types/chat';
 
 interface OutgoingCallModalProps {

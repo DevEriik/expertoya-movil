@@ -1,7 +1,7 @@
 import { useTheme } from "@/hooks/use-theme";
 import { apiClient } from "@/utils/api";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useRouter } from '@/navigation/routerCompat';
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,

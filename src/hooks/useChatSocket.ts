@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import * as ImagePicker from 'expo-image-picker';
+import { ImagePicker } from '@/utils/mediaPicker';
 import { Alert, Platform } from 'react-native';
 import { apiClient, API_URL } from '@/utils/api';
 import { createFormDataFile } from '@/utils/fileUpload';

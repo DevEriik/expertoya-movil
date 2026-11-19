@@ -1,7 +1,7 @@
 import { useAccessibility } from "@/context/AccessibilityContext";
 import { useTheme } from "@/hooks/use-theme";
 import { useDiagnosticoIA } from "@/hooks/useDiagnosticoIA";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from '@/components/ui/VectorIcons';
 import {
   Image,
   StyleSheet,

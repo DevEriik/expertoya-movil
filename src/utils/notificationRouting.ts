@@ -1,4 +1,4 @@
-import type { Href } from "expo-router";
+export type Href = string;
 
 export const RUTA_BANDEJA = "/notificaciones" as const;
 
@@ -25,5 +25,5 @@ export function resolverRutaNotificacion(data: unknown): Href {
     return RUTA_BANDEJA;
   }
 
-  return limpia as Href;
+  return limpia;
 }

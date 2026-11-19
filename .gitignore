@@ -41,9 +41,15 @@ yarn-error.*
 
 example
 
-# generated native folders
+# Native build artifacts (android/ itself IS tracked in bare RN)
 /ios
-/android
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+*.keystore
+*.apk
+*.aab
 
 # Agents
 AGENTS.md

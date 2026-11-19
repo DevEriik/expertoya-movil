@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/navigation/routerCompat';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useAccessibility } from '@/context/AccessibilityContext';
-import Constants from 'expo-constants';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@/components/ui/VectorIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { apiClient } from '@/utils/api';
 import { Logo } from '@/components/Logo';

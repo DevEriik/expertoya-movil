@@ -6,8 +6,8 @@ import {
 import { useAccessibility } from "@/context/AccessibilityContext";
 import { type Solicitud, useSolicitudes } from "@/hooks/useSolicitudes";
 import { useSolicitudesRealtime } from "@/hooks/useSolicitudesRealtime";
-import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useFocusEffect, useRouter } from '@/navigation/routerCompat';
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
