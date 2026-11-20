@@ -1,0 +1,597 @@
+import { AdminNotice } from "@/components/AdminNotice";
+import { useAccessibility } from "@/context/AccessibilityContext";
+import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/hooks/use-theme";
+import {
+  getSonidoActivo,
+  setSonidoActivo,
+} from "@/utils/notificationPreferences";
+import {
+  getNotificationPermissionInfo,
+  openNotificationSettings,
+  requestNotificationPermissions,
+  type NotificationPermissionInfo,
+} from "@/utils/notifications";
+import {
+  describirErrorPush,
+  registerPushToken,
+} from "@/utils/pushNotifications";
+import { isAdmin, isCliente, isProfesional } from "@/utils/roles";
+import { Ionicons } from '@/components/ui/VectorIcons';
+import { useFocusEffect, useRouter } from '@/navigation/routerCompat';
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const CustomSwitch = ({
+  value,
+  onValueChange,
+  activeColor,
+  inactiveColor,
+}: any) => {
+  const animatedValue = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: value ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [value]);
+
+  const translateX = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [2, 22],
+  });
+  const backgroundColor = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [inactiveColor, activeColor],
+  });
+
+  return (
+    <TouchableOpacity activeOpacity={0.8} onPress={() => onValueChange(!value)}>
+      <Animated.View
+        style={{
+          width: 50,
+          height: 30,
+          borderRadius: 15,
+          backgroundColor,
+          justifyContent: "center",
+        }}
+      >
+        <Animated.View
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 13,
+            backgroundColor: "#FFFFFF",
+            transform: [{ translateX }],
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.2,
+            shadowRadius: 2,
+            elevation: 2,
+          }}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+export default function NotificationsScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const colors = useTheme();
+  const { isDarkMode: isDark } = useAccessibility();
+  const { usuario } = useAuth();
+
+  const [messages, setMessages] = useState(true);
+  const [escrowAlerts, setEscrowAlerts] = useState(true);
+  const [marketing, setMarketing] = useState(false);
+  const [newRequests, setNewRequests] = useState(true);
+  const [quotesReceived, setQuotesReceived] = useState(true);
+  const [jobStatus, setJobStatus] = useState(true);
+  const [sonidoActivo, setSonidoActivoState] = useState(true);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionInfo | null>(null);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [registrandoPush, setRegistrandoPush] = useState(false);
+
+  const admin = isAdmin(usuario?.rol);
+  const showProSection = admin || isProfesional(usuario?.rol);
+  const showClientSection = admin || isCliente(usuario?.rol);
+
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+
+      getNotificationPermissionInfo()
+        .then((info) => {
+          if (!mounted) return;
+          setNotificationPermission(info);
+          if (info.state === "granted") {
+            void registrarPush();
+          }
+        })
+        .catch((error) => {
+          console.warn("No se pudo leer el permiso de notificaciones:", error);
+        });
+
+      return () => {
+        mounted = false;
+      };
+    }, []),
+  );
+
+  const registrarPush = useCallback(async (forzar = false) => {
+    setRegistrandoPush(true);
+
+    try {
+      await registerPushToken({ force: forzar });
+      setPushError(null);
+    } catch (error) {
+      console.warn("No se pudo registrar el token push:", error);
+      setPushError(describirErrorPush(error));
+    } finally {
+      setRegistrandoPush(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    getSonidoActivo()
+      .then((valor) => setSonidoActivoState(valor))
+      .catch((error) => {
+        console.warn("No se pudo leer la preferencia de sonido:", error);
+      });
+  }, []);
+
+  const permissionGranted = notificationPermission?.state === "granted";
+  const permissionDenied = notificationPermission?.state === "denied";
+
+  const handleNotificationPermission = async () => {
+    if (isRequestingPermission) return;
+
+    setIsRequestingPermission(true);
+
+    try {
+      if (permissionDenied && !notificationPermission?.canAskAgain) {
+        await openNotificationSettings();
+        return;
+      }
+
+      const info = await requestNotificationPermissions();
+      setNotificationPermission(info);
+
+      if (info.state === "granted") {
+        void registrarPush();
+      }
+
+      if (info.state === "denied") {
+        Alert.alert(
+          "Notificaciones bloqueadas",
+          "Podés habilitarlas desde los ajustes del sistema.",
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Abrir ajustes",
+              onPress: () => {
+                void openNotificationSettings();
+              },
+            },
+          ],
+        );
+      }
+    } catch (error) {
+      console.warn("No se pudo solicitar el permiso de notificaciones:", error);
+      Alert.alert(
+        "Error",
+        "No se pudo solicitar el permiso de notificaciones.",
+      );
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
+
+  const handleSonido = (valor: boolean) => {
+    setSonidoActivoState(valor);
+
+    setSonidoActivo(valor).catch((error) => {
+      console.warn("No se pudo guardar la preferencia de sonido:", error);
+      setSonidoActivoState(!valor);
+    });
+  };
+
+  const workTitle = admin
+    ? "Solicitudes, Trabajos y Mensajes"
+    : isProfesional(usuario?.rol)
+      ? "Solicitudes y Mensajes"
+      : "Trabajos y Mensajes";
+  const messageTitle = admin
+    ? "Mensajes de Clientes y Expertos"
+    : isProfesional(usuario?.rol)
+      ? "Mensajes de Clientes"
+      : "Mensajes del Experto";
+  const escrowSubtitle = admin
+    ? "Fondos retenidos, liberados y confirmaciones de pago"
+    : isProfesional(usuario?.rol)
+      ? "Fondos retenidos y liberados"
+      : "Confirmaciones de pagos al Escrow";
+
+  const FigmaToggle = ({ title, subtitle, value, onValueChange }: any) => (
+    <View style={styles.settingRow}>
+      <View style={styles.textContainer}>
+        <Text style={[styles.settingTitle, { color: colors.text }]}>
+          {title}
+        </Text>
+        <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>
+          {subtitle}
+        </Text>
+      </View>
+      <CustomSwitch
+        value={value}
+        onValueChange={onValueChange}
+        activeColor={colors.primary}
+        inactiveColor={colors.backgroundSelected}
+      />
+    </View>
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <View style={styles.headerTitles}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Notificaciones
+          </Text>
+          <Text
+            style={[styles.headerSubtitle, { color: colors.textSecondary }]}
+          >
+            Gestiona tus alertas y avisos.
+          </Text>
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {admin && (
+          <AdminNotice message="Vista de administrador: ves las secciones de cliente y profesional." />
+        )}
+
+        <View
+          style={[styles.card, { backgroundColor: colors.backgroundElement }]}
+        >
+          <View style={styles.cardHeader}>
+            <Ionicons
+              name="notifications-outline"
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              Permiso del sistema
+            </Text>
+          </View>
+
+          <View style={styles.settingRow}>
+            <View style={styles.textContainer}>
+              <Text style={[styles.settingTitle, { color: colors.text }]}>
+                {permissionGranted
+                  ? "Notificaciones habilitadas"
+                  : permissionDenied
+                    ? "Notificaciones bloqueadas"
+                    : "Notificaciones desactivadas"}
+              </Text>
+              <Text
+                style={[
+                  styles.settingSubtitle,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {permissionGranted
+                  ? "La app puede mostrarte avisos y alertas."
+                  : permissionDenied
+                    ? "Habilitá el permiso desde los ajustes del sistema."
+                    : "Activá el permiso para recibir avisos importantes."}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleNotificationPermission}
+              disabled={isRequestingPermission || permissionGranted}
+              style={[
+                styles.permissionButton,
+                {
+                  backgroundColor: permissionGranted
+                    ? colors.successBg
+                    : colors.primary,
+                },
+                (isRequestingPermission || permissionGranted) && {
+                  opacity: 0.6,
+                },
+              ]}
+            >
+              {isRequestingPermission ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text
+                  style={[
+                    styles.permissionButtonText,
+                    {
+                      color: permissionGranted ? colors.success : "#FFFFFF",
+                    },
+                  ]}
+                >
+                  {permissionGranted
+                    ? "Activo"
+                    : permissionDenied
+                      ? "Abrir ajustes"
+                      : "Activar"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View
+            style={[
+              styles.divider,
+              { backgroundColor: colors.backgroundSelected },
+            ]}
+          />
+
+          <View style={styles.settingRow}>
+            <View style={styles.textContainer}>
+              <Text
+                style={[
+                  styles.settingTitle,
+                  { color: pushError ? "#EF4444" : colors.text },
+                ]}
+              >
+                {!permissionGranted
+                  ? "Dispositivo sin registrar"
+                  : pushError
+                    ? "No se pudo registrar el dispositivo"
+                    : "Dispositivo registrado"}
+              </Text>
+              <Text
+                style={[
+                  styles.settingSubtitle,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {!permissionGranted
+                  ? "Concedé el permiso para recibir notificaciones."
+                  : pushError
+                    ? pushError
+                    : "Este teléfono va a recibir las notificaciones."}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => registrarPush(true)}
+              disabled={!permissionGranted || registrandoPush}
+              style={[
+                styles.permissionButton,
+                { backgroundColor: colors.backgroundSelected },
+                (!permissionGranted || registrandoPush) && { opacity: 0.6 },
+              ]}
+            >
+              {registrandoPush ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <Text
+                  style={[styles.permissionButtonText, { color: colors.text }]}
+                >
+                  {pushError ? "Reintentar" : "Verificar"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View
+          style={[styles.card, { backgroundColor: colors.backgroundElement }]}
+        >
+          <View style={styles.cardHeader}>
+            <Ionicons
+              name={
+                sonidoActivo ? "volume-high-outline" : "volume-mute-outline"
+              }
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              Sonido
+            </Text>
+          </View>
+
+          <FigmaToggle
+            title="Sonido de notificaciones"
+            subtitle={
+              sonidoActivo
+                ? "Los avisos suenan cuando la app está abierta."
+                : "Los avisos llegan sin sonido ni banner."
+            }
+            value={sonidoActivo}
+            onValueChange={handleSonido}
+          />
+        </View>
+        <View
+          style={[styles.card, { backgroundColor: colors.backgroundElement }]}
+        >
+          <View style={styles.cardHeader}>
+            <Ionicons
+              name="briefcase-outline"
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              {workTitle}
+            </Text>
+          </View>
+
+          {showProSection && (
+            <>
+              <FigmaToggle
+                title="Nuevas Solicitudes"
+                subtitle="Cuando un cliente te pide presupuesto"
+                value={newRequests}
+                onValueChange={setNewRequests}
+              />
+              <View
+                style={[
+                  styles.divider,
+                  { backgroundColor: colors.backgroundSelected },
+                ]}
+              />
+            </>
+          )}
+
+          {showClientSection && (
+            <>
+              <FigmaToggle
+                title="Presupuestos Recibidos"
+                subtitle="Cuando un experto te envía un precio"
+                value={quotesReceived}
+                onValueChange={setQuotesReceived}
+              />
+              <View
+                style={[
+                  styles.divider,
+                  { backgroundColor: colors.backgroundSelected },
+                ]}
+              />
+              <FigmaToggle
+                title="Estado del Trabajo"
+                subtitle="Alertas de inicio y finalización del servicio"
+                value={jobStatus}
+                onValueChange={setJobStatus}
+              />
+              <View
+                style={[
+                  styles.divider,
+                  { backgroundColor: colors.backgroundSelected },
+                ]}
+              />
+            </>
+          )}
+
+          <FigmaToggle
+            title={messageTitle}
+            subtitle="Nuevos mensajes en el chat interno"
+            value={messages}
+            onValueChange={setMessages}
+          />
+        </View>
+
+        <View
+          style={[styles.card, { backgroundColor: colors.backgroundElement }]}
+        >
+          <View style={styles.cardHeader}>
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              Pagos y Escrow
+            </Text>
+          </View>
+          <FigmaToggle
+            title="Actualizaciones de Pagos"
+            subtitle={escrowSubtitle}
+            value={escrowAlerts}
+            onValueChange={setEscrowAlerts}
+          />
+        </View>
+
+        <View
+          style={[styles.card, { backgroundColor: colors.backgroundElement }]}
+        >
+          <View style={styles.cardHeader}>
+            <Ionicons
+              name="mail-unread-outline"
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              Otros
+            </Text>
+          </View>
+          <FigmaToggle
+            title="Novedades y Promociones"
+            subtitle="Correos sobre actualizaciones de ExpertoYa"
+            value={marketing}
+            onValueChange={setMarketing}
+          />
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: { paddingHorizontal: 16, paddingBottom: 16 },
+  backButton: { paddingVertical: 8, alignSelf: "flex-start" },
+  headerTitles: { marginTop: 8 },
+  headerTitle: { fontSize: 28, fontWeight: "800", marginBottom: 4 },
+  headerSubtitle: { fontSize: 15, fontWeight: "500" },
+  content: { flex: 1, padding: 16 },
+  card: {
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 24,
+    overflow: "hidden",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  cardTitle: { fontSize: 16, fontWeight: "800" },
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  textContainer: { flex: 1, paddingRight: 16 },
+  settingTitle: { fontSize: 15, fontWeight: "700", marginBottom: 4 },
+  settingSubtitle: { fontSize: 13, fontWeight: "500" },
+  divider: { height: 1, marginHorizontal: 16 },
+  permissionButton: {
+    minWidth: 92,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  permissionButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+});

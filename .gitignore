@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Environment variables
+.env*
+
 # Native
 .kotlin/
 *.orig.*
@@ -38,6 +41,18 @@ yarn-error.*
 
 example
 
-# generated native folders
+# Native build artifacts (android/ itself IS tracked in bare RN)
 /ios
-/android
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+*.keystore
+*.apk
+*.aab
+
+# Agents
+AGENTS.md
+
+google-services.json
+GoogleService-Info.plist

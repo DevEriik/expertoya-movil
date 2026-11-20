@@ -3,12 +3,19 @@
  * https://docs.expo.dev/guides/color-schemes/
  */
 
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AppThemePalette, getThemeColors } from "@/constants/theme";
+import { AccessibilityContext } from "@/context/AccessibilityContext";
+import { useContext } from "react";
+import { useColorScheme } from "react-native";
 
-export function useTheme() {
-  const scheme = useColorScheme();
-  const theme = scheme === 'unspecified' ? 'light' : scheme;
+export function useTheme(): AppThemePalette {
+  const accessContext = useContext(AccessibilityContext);
+  const systemScheme = useColorScheme();
 
-  return Colors[theme];
+  if (accessContext) {
+    return accessContext.colors;
+  }
+
+  const isDark = systemScheme === "dark";
+  return getThemeColors(isDark, false);
 }
