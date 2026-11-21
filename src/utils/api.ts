@@ -5,12 +5,20 @@ import { getToken } from "./secureStore";
 const RENDER_BACKEND_URL = "https://expertoya-backend.onrender.com";
 
 const getBaseApiUrl = (): string => {
-  const envUrl =
-    Config.API_URL ||
-    process.env.EXPO_PUBLIC_API_URL ||
-    (import.meta as any)?.env?.VITE_API_URL;
+  const candidates = [
+    (import.meta as any)?.env?.VITE_API_URL,
+    typeof process !== "undefined"
+      ? process.env?.EXPO_PUBLIC_API_URL
+      : undefined,
+    typeof process !== "undefined" ? process.env?.API_URL : undefined,
+    Config?.API_URL,
+  ];
 
-  if (envUrl && envUrl.trim() !== "") {
+  const envUrl = candidates.find(
+    (v): v is string => typeof v === "string" && v.trim() !== "",
+  );
+
+  if (envUrl) {
     return envUrl.trim().replace(/\/+$/, "");
   }
 
