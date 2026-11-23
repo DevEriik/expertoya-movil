@@ -2,8 +2,13 @@ import Config from 'react-native-config';
 import { Platform, DeviceEventEmitter, NativeModules } from 'react-native';
 import { getToken } from './secureStore';
 
+const normalizeUrl = (url: string): string => url.trim().replace(/\/+$/, '');
+
 const getBaseApiUrl = (): string => {
   if (Platform.OS === 'web') {
+    if (typeof process !== 'undefined' && process.env?.API_URL) {
+      return normalizeUrl(process.env.API_URL);
+    }
     if (typeof window !== 'undefined' && window.location) {
       if (
         window.location.hostname === 'localhost' ||
@@ -16,11 +21,11 @@ const getBaseApiUrl = (): string => {
     return 'http://localhost:3000';
   }
 
-  if (Config.API_URL) {
-    return Config.API_URL;
+  if (typeof Config.API_URL === 'string' && Config.API_URL.trim().length > 0) {
+    return normalizeUrl(Config.API_URL);
   }
 
-  // En desarrollo con Metro, extraer la IP del bundle URL si está disponible
+  // Fallback solo para desarrollo local si no hubiera .env
   const scriptURL: string | undefined = NativeModules.SourceCode?.scriptURL;
   if (scriptURL) {
     const match = scriptURL.match(/^https?:\/\/([^:/]+)/);

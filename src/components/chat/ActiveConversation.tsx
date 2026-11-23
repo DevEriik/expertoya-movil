@@ -137,9 +137,9 @@ export const ActiveConversation: React.FC<Props> = ({
   const { usuario, token } = useAuth();
 
   const isUserTheProfessional =
-    (usuario?.id && chat.professional?.id && usuario.id === chat.professional.id) ||
-    (usuario?.id && chat.client?.id && usuario.id !== chat.client.id) ||
-    activeRole === 'PROFESIONAL';
+    usuario?.id && chat.client?.id
+      ? usuario.id !== chat.client.id
+      : activeRole === 'PROFESIONAL';
 
   const otherPerson = isUserTheProfessional ? chat.client : chat.professional;
   const currentPerson = isUserTheProfessional ? chat.professional : chat.client;

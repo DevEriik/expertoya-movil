@@ -146,9 +146,9 @@ export const MessagesList: React.FC<Props> = ({
         <View style={styles.list}>
           {chats.map((chat) => {
             const isUserTheProfessional =
-              (usuario?.id && chat.professional?.id && usuario.id === chat.professional.id) ||
-              (usuario?.id && chat.client?.id && usuario.id !== chat.client.id) ||
-              activeRole === 'PROFESIONAL';
+              usuario?.id && chat.client?.id
+                ? usuario.id !== chat.client.id
+                : activeRole === 'PROFESIONAL';
             const otherPerson = isUserTheProfessional ? chat.client : chat.professional;
 
             const imageSource =
