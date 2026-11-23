@@ -248,7 +248,7 @@ export default function CreateServiceModal() {
         mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.5,
         base64: true,
       });
 
@@ -284,7 +284,7 @@ export default function CreateServiceModal() {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.5,
         base64: true,
       });
 
@@ -534,7 +534,7 @@ export default function CreateServiceModal() {
       ]}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardView}
       >
         <View
@@ -1740,7 +1740,7 @@ const styles = StyleSheet.create({
     width: "92%",
     maxWidth: 600,
     flex: 1,
-    minHeight: 420,
+    minHeight: 0,
     maxHeight: "92%",
     borderRadius: 24,
     borderWidth: 1.2,

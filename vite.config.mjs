@@ -1,6 +1,6 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { defineConfig, transformWithOxc } from 'vite';
+import { defineConfig, loadEnv, transformWithOxc } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -132,54 +132,58 @@ function rnRequireTransformPlugin() {
   };
 }
 
-export default defineConfig({
-  plugins: [nativeStubsPlugin(), rnRequireTransformPlugin(), rnJsxTransformPlugin(), react()],
-  define: {
-    global: 'globalThis',
-    __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-  },
-  resolve: {
-    extensions: [
-      '.web.tsx',
-      '.web.ts',
-      '.web.jsx',
-      '.web.js',
-      '.tsx',
-      '.ts',
-      '.jsx',
-      '.js',
-      '.json',
-    ],
-    alias: {
-      'react-native': path.resolve(__dirname, 'src/utils/rnWebShim.ts'),
-      '@/assets': path.resolve(__dirname, 'assets'),
-      '@': path.resolve(__dirname, 'src'),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, __dirname, '');
+  return {
+    plugins: [nativeStubsPlugin(), rnRequireTransformPlugin(), rnJsxTransformPlugin(), react()],
+    define: {
+      global: 'globalThis',
+      __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
+      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+      'process.env.API_URL': JSON.stringify(env.API_URL || ''),
     },
-  },
-  optimizeDeps: {
-    exclude: Array.from(NATIVE_ONLY_MODULES),
-    rolldownOptions: {
-      moduleTypes: {
-        '.js': 'jsx',
-      },
-      resolve: {
-        extensions: [
-          '.web.tsx',
-          '.web.ts',
-          '.web.jsx',
-          '.web.js',
-          '.tsx',
-          '.ts',
-          '.jsx',
-          '.js',
-          '.json',
-        ],
+    resolve: {
+      extensions: [
+        '.web.tsx',
+        '.web.ts',
+        '.web.jsx',
+        '.web.js',
+        '.tsx',
+        '.ts',
+        '.jsx',
+        '.js',
+        '.json',
+      ],
+      alias: {
+        'react-native': path.resolve(__dirname, 'src/utils/rnWebShim.ts'),
+        '@/assets': path.resolve(__dirname, 'assets'),
+        '@': path.resolve(__dirname, 'src'),
       },
     },
-  },
-  server: {
-    port: 5173,
-    open: false,
-  },
+    optimizeDeps: {
+      exclude: Array.from(NATIVE_ONLY_MODULES),
+      rolldownOptions: {
+        moduleTypes: {
+          '.js': 'jsx',
+        },
+        resolve: {
+          extensions: [
+            '.web.tsx',
+            '.web.ts',
+            '.web.jsx',
+            '.web.js',
+            '.tsx',
+            '.ts',
+            '.jsx',
+            '.js',
+            '.json',
+          ],
+        },
+      },
+    },
+    server: {
+      port: 5173,
+      open: false,
+    },
+  };
 });

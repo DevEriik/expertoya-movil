@@ -4,22 +4,41 @@ import { getToken } from "./secureStore";
 
 const RENDER_BACKEND_URL = "https://expertoya-backend.onrender.com";
 
+const normalizeUrl = (url: string): string => url.trim().replace(/\/+$/, '');
+
 const getBaseApiUrl = (): string => {
-  const candidates = [
-    (import.meta as any)?.env?.VITE_API_URL,
-    typeof process !== "undefined"
-      ? process.env?.EXPO_PUBLIC_API_URL
-      : undefined,
-    typeof process !== "undefined" ? process.env?.API_URL : undefined,
-    Config?.API_URL,
-  ];
+  if (Platform.OS === 'web') {
+    const webEnvUrl =
+      typeof process !== 'undefined'
+        ? process.env?.API_URL || process.env?.VITE_API_URL
+        : undefined;
+    if (typeof webEnvUrl === 'string' && webEnvUrl.trim().length > 0) {
+      return normalizeUrl(webEnvUrl);
+    }
+    if (typeof window !== 'undefined' && window.location) {
+      if (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1'
+      ) {
+        return 'http://localhost:3000';
+      }
+      return `http://${window.location.hostname}:3000`;
+    }
+    return 'http://localhost:3000';
+  }
 
-  const envUrl = candidates.find(
-    (v): v is string => typeof v === "string" && v.trim() !== "",
-  );
+  if (typeof Config.API_URL === 'string' && Config.API_URL.trim().length > 0) {
+    return normalizeUrl(Config.API_URL);
+  }
 
-  if (envUrl) {
-    return envUrl.trim().replace(/\/+$/, "");
+  const scriptURL: string | undefined = NativeModules.SourceCode?.scriptURL;
+  if (scriptURL) {
+    const match = scriptURL.match(/^https?:\/\/([^:/]+)/);
+    const hostIp = match?.[1];
+    if (hostIp && hostIp !== 'localhost' && hostIp !== '127.0.0.1') {
+      return `http://${hostIp}:3000`;
+    }
+  }
   }
 
   return RENDER_BACKEND_URL;
