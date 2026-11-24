@@ -178,6 +178,7 @@ export const ActiveConversation: React.FC<Props> = ({
   });
 
   // Estados para Menú de Seguridad y Modales de Bloqueo / Denuncia en Mobile
+  const [escrowBannerMinimizado, setEscrowBannerMinimizado] = useState(false);
   const [mostrarMenuOpciones, setMostrarMenuOpciones] = useState(false);
   const [mostrarModalBloqueo, setMostrarModalBloqueo] = useState(false);
   const [motivoBloqueo, setMotivoBloqueo] = useState('Trato inadecuado o irrespetuoso');
@@ -841,7 +842,17 @@ export const ActiveConversation: React.FC<Props> = ({
               },
             ]}
           >
-            <View style={styles.escrowStatusRow}>
+            <TouchableOpacity
+              style={styles.escrowStatusRow}
+              onPress={() => setEscrowBannerMinimizado((prev) => !prev)}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel={
+                escrowBannerMinimizado
+                  ? 'Expandir información de custodia y pago'
+                  : 'Minimizar información de custodia y pago'
+              }
+            >
               <Ionicons
                 name="shield-checkmark-outline"
                 size={18}
@@ -872,33 +883,61 @@ export const ActiveConversation: React.FC<Props> = ({
                 numberOfLines={1}
               >
                 {chat.escrowStatus === 'RELEASED'
-                  ? `Fondos liberados con éxito (${chat.escrowAmount}).`
+                  ? `Fondos liberados (${chat.escrowAmount})`
                   : hasEscrow
-                    ? `Fondos en custodia garantizada (${chat.escrowAmount}).`
-                    : 'Chat protegido por Garantía Escrow ExpertoYa.'}
+                    ? `Fondos en custodia (${chat.escrowAmount})`
+                    : 'Garantía Escrow ExpertoYa'}
               </Text>
-            </View>
+              <Ionicons
+                name={escrowBannerMinimizado ? 'chevron-down' : 'chevron-up'}
+                size={18}
+                color={isDark ? '#94A3B8' : '#475569'}
+              />
+            </TouchableOpacity>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <TouchableOpacity
-                onPress={() => setMostrarModalSeguridad(true)}
-                style={styles.securityTipsBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="information-circle-outline" size={13} color="#FF8C00" />
-                <Text style={styles.securityTipsBtnText}>Seguridad</Text>
-              </TouchableOpacity>
+            {!escrowBannerMinimizado && (
+              <View style={styles.escrowActionsRow}>
+                <TouchableOpacity
+                  onPress={() => setMostrarModalSeguridad(true)}
+                  style={[
+                    styles.securityTipsBtn,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(245, 158, 11, 0.16)'
+                        : '#FEF3C7',
+                      borderColor: isDark
+                        ? 'rgba(251, 191, 36, 0.35)'
+                        : '#F59E0B',
+                    },
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={16}
+                    color={isDark ? '#FBBF24' : '#B45309'}
+                  />
+                  <Text
+                    style={[
+                      styles.securityTipsBtnText,
+                      { color: isDark ? '#FBBF24' : '#92400E' },
+                    ]}
+                  >
+                    Seguridad
+                  </Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.releaseButton}
-                onPress={handlePaymentPress}
-                activeOpacity={0.85}
-                accessible={true}
-                accessibilityLabel="Gestionar el pago de la solicitud"
-              >
-                <Text style={styles.releaseButtonText}>Gestionar pago</Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={styles.releaseButton}
+                  onPress={handlePaymentPress}
+                  activeOpacity={0.85}
+                  accessible={true}
+                  accessibilityLabel="Gestionar el pago de la solicitud"
+                >
+                  <Text style={styles.releaseButtonText}>Gestionar pago</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         );
       })()}
@@ -2636,10 +2675,11 @@ const styles = StyleSheet.create({
   },
   escrowBanner: {
     marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 6,
-    padding: 12,
-    borderRadius: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
     borderWidth: 1,
   },
   escrowStatusRow: {
@@ -2647,22 +2687,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  escrowActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+  },
   escrowText: {
     fontSize: 13,
     fontWeight: '700',
     flex: 1,
   },
   releaseButton: {
-    marginTop: 10,
+    flex: 1,
     backgroundColor: '#10B981',
     paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   releaseButtonText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
   },
   messagesContainer: {
     flex: 1,
@@ -3364,17 +3412,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   securityTipsBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 140, 0, 0.1)',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
   },
   securityTipsBtnText: {
-    color: '#FF8C00',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   liveSecurityAlert: {

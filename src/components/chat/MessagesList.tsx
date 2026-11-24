@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@/components/ui/VectorIcons';
 import { useRouter } from '@/navigation/routerCompat';
@@ -16,6 +17,7 @@ import { ChatStatusBadge } from './ChatStatusBadge';
 interface Props {
   chats: ChatSession[];
   onSelectChat: (chatId: string) => void;
+  onDeleteChat?: (chatId: string) => void;
   activeRole: UserRole;
   colors: any;
   isDark?: boolean;
@@ -24,6 +26,7 @@ interface Props {
 export const MessagesList: React.FC<Props> = ({
   chats,
   onSelectChat,
+  onDeleteChat,
   activeRole,
   colors,
   isDark = false,
@@ -220,7 +223,32 @@ export const MessagesList: React.FC<Props> = ({
                     >
                       {chat.lastMessage}
                     </Text>
-                    <ChatStatusBadge status={chat.status} isDark={isDark} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <ChatStatusBadge status={chat.status} isDark={isDark} />
+                      {chat.status === 'COMPLETADO' && onDeleteChat && (
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation?.();
+                            Alert.alert(
+                              'Eliminar conversación',
+                              '¿Querés quitar este chat finalizado de tu bandeja?',
+                              [
+                                { text: 'Cancelar', style: 'cancel' },
+                                {
+                                  text: 'Eliminar',
+                                  style: 'destructive',
+                                  onPress: () => onDeleteChat(chat.id),
+                                },
+                              ],
+                            );
+                          }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityLabel="Eliminar conversación finalizada"
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 </View>
               </TouchableOpacity>

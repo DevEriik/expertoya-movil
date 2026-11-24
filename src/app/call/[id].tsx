@@ -95,6 +95,7 @@ export default function CallScreen() {
   const decodedRoomUrl = roomUrl ? decodeURIComponent(roomUrl) : '';
 
   const callStartTimeRef = useRef<number | null>(null);
+  const callEndEmittedRef = useRef(false);
 
   const getElapsedSeconds = React.useCallback(() => {
     return callStartTimeRef.current
@@ -102,14 +103,23 @@ export default function CallScreen() {
       : 0;
   }, []);
 
-  const handleOnCallEnd = React.useCallback((reason?: string) => {
+  const emitCallEndOnce = React.useCallback(() => {
+    if (callEndEmittedRef.current) return;
+    callEndEmittedRef.current = true;
     if (socketRef.current?.connected && solicitudId) {
-      socketRef.current.emit('call:end', { solicitud_id: solicitudId, duracion: getElapsedSeconds() });
+      socketRef.current.emit('call:end', {
+        solicitud_id: solicitudId,
+        duracion: getElapsedSeconds(),
+      });
     }
+  }, [solicitudId, getElapsedSeconds]);
+
+  const handleOnCallEnd = React.useCallback((reason?: string) => {
+    emitCallEndOnce();
     setTimeout(() => {
       router.back();
     }, 250);
-  }, [solicitudId, router, getElapsedSeconds]);
+  }, [router, emitCallEndOnce]);
 
   const {
     callState,
@@ -148,6 +158,7 @@ export default function CallScreen() {
 
     socket.on('call:ended', (data: { solicitud_id: string; motivo?: string; finalizado_por?: string }) => {
       if (data.solicitud_id === solicitudId) {
+        callEndEmittedRef.current = true;
         void handleHangUp();
         if (data.finalizado_por !== usuario?.id) {
           Alert.alert(
@@ -173,9 +184,7 @@ export default function CallScreen() {
   }, [callState]);
 
   const onHangUpPress = async () => {
-    if (socketRef.current?.connected && solicitudId) {
-      socketRef.current.emit('call:end', { solicitud_id: solicitudId, duracion: getElapsedSeconds() });
-    }
+    emitCallEndOnce();
     await handleHangUp();
   };
 
