@@ -1,7 +1,7 @@
 import { Platform, DeviceEventEmitter, NativeModules } from "react-native"; import Config from "react-native-config";
 import { getToken } from "./secureStore";
 
-const RENDER_BACKEND_URL = "https://expertoya-backend.onrender.com";
+const RENDER_BACKEND_URL = "https://api.expertoya.com.ar";
 
 const normalizeUrl = (url: string): string => url.trim().replace(/\/+$/, '');
 
