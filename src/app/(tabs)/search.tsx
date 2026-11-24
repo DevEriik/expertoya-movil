@@ -9,7 +9,7 @@ import { apiClient } from "@/utils/api";
 import { COVERAGE_MESSAGE, isInCoverageZone } from "@/utils/geoZone";
 import { getPublicServicesByProfessionalId } from "@/utils/servicesStorage";
 import { Ionicons } from '@/components/ui/VectorIcons';
-import { useRouter } from '@/navigation/routerCompat';
+import { useLocalSearchParams, useRouter } from '@/navigation/routerCompat';
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -51,6 +51,7 @@ const RADIO_POR_DEFECTO = 10;
 
 export default function BusquedaScreen() {
   const router = useRouter();
+  const { oficio: oficioParam } = useLocalSearchParams<{ oficio?: string }>();
   const colors = useTheme();
   const { usuario } = useAuth();
   const {
@@ -187,6 +188,18 @@ export default function BusquedaScreen() {
     }
   };
 
+  useEffect(() => {
+    if (!oficioParam) return;
+    setSearchTerm(oficioParam);
+    const match = profesiones.find(
+      (p) => p.nombre.toLowerCase() === oficioParam.toLowerCase(),
+    );
+    if (match) {
+      setSelectedProfesion(match._id);
+    }
+    buscarProfesionales();
+  }, [oficioParam, profesiones.length]);
+
   const profesionalesVisibles = useMemo(() => {
     if (!useGPS || !coords) return profesionales;
 
@@ -196,180 +209,180 @@ export default function BusquedaScreen() {
   const siguienteRadio = RADIOS_KM.find((r) => r > radioKm);
   const sinResultadosEnRadio =
     profesionales.length > 0 && profesionalesVisibles.length === 0;
-const renderProfesional = ({ item }: { item: Profesional }) => (
-  <TouchableOpacity
-    activeOpacity={0.8}
-    onPress={() => handleSelectProfesional(item)}
-    style={[
-      styles.card,
-      {
-        backgroundColor: colors.backgroundElement,
-        borderColor: colors.backgroundSelected,
-      },
-    ]}
-  >
-    <View style={styles.cardHeader}>
-      <Image
-        source={{
-          uri:
-            item.usuario.fotoPerfil &&
-            !(
-              Platform.OS === "web" &&
-              item.usuario.fotoPerfil.startsWith("file://")
-            )
-              ? item.usuario.fotoPerfil
-              : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  `${item.usuario.nombre} ${item.usuario.apellido}`,
-                )}`,
-        }}
-        style={styles.avatar}
-      />
-      <View style={styles.cardInfo}>
-        <Text style={[styles.name, { color: colors.text }]}>
-          {item.usuario.nombre} {item.usuario.apellido}
-        </Text>
-        <Text style={[styles.profesion, { color: colors.primary }]}>
-          {item.profesiones.map((p) => p.nombre).join(", ")}
-        </Text>
-        <View style={styles.metaRow}>
-          {item.usuario.calificacionPromedio !== undefined && (
-            <View style={styles.rating}>
-              <Ionicons name="star" size={14} color="#FBBF24" />
-              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                {item.usuario.calificacionPromedio.toFixed(1)}
-              </Text>
-            </View>
-          )}
-          {item.distanciaKm !== undefined && (
-            <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-              • {item.distanciaKm.toFixed(1)} km
-            </Text>
-          )}
-        </View>
-      </View>
-    </View>
-
-    {/* CONTENEDOR INFERIOR: Precio y botones alineados sin texto suelto */}
-    <View
+  const renderProfesional = ({ item }: { item: Profesional }) => (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => handleSelectProfesional(item)}
       style={[
-        styles.cardFooterRow,
+        styles.card,
         {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
+          backgroundColor: colors.backgroundElement,
+          borderColor: colors.backgroundSelected,
         },
       ]}
     >
-      {/* Bloque de Tarifa a la izquierda */}
-      <View>
-        {item.tarifaBase !== undefined ? (
-          <Text
-            style={[
-              styles.tarifa,
-              { color: colors.text, fontSize: 14, fontWeight: "bold" },
-            ]}
-          >
-            ${item.tarifaBase}/hora
+      <View style={styles.cardHeader}>
+        <Image
+          source={{
+            uri:
+              item.usuario.fotoPerfil &&
+                !(
+                  Platform.OS === "web" &&
+                  item.usuario.fotoPerfil.startsWith("file://")
+                )
+                ? item.usuario.fotoPerfil
+                : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  `${item.usuario.nombre} ${item.usuario.apellido}`,
+                )}`,
+          }}
+          style={styles.avatar}
+        />
+        <View style={styles.cardInfo}>
+          <Text style={[styles.name, { color: colors.text }]}>
+            {item.usuario.nombre} {item.usuario.apellido}
           </Text>
-        ) : (
-          <Text
-            style={[
-              styles.tarifaConsultar,
-              { color: colors.textSecondary, fontSize: 12 },
-            ]}
-          >
-            A convenir
+          <Text style={[styles.profesion, { color: colors.primary }]}>
+            {item.profesiones.map((p) => p.nombre).join(", ")}
           </Text>
-        )}
+          <View style={styles.metaRow}>
+            {item.usuario.calificacionPromedio !== undefined && (
+              <View style={styles.rating}>
+                <Ionicons name="star" size={14} color="#FBBF24" />
+                <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                  {item.usuario.calificacionPromedio.toFixed(1)}
+                </Text>
+              </View>
+            )}
+            {item.distanciaKm !== undefined && (
+              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                • {item.distanciaKm.toFixed(1)} km
+              </Text>
+            )}
+          </View>
+        </View>
       </View>
 
-      {item.usuario._id === usuario?.id || item._id === usuario?.id ? (
-        <View style={styles.cardSelfBadge}>
-          <Ionicons
-            name="person-circle-outline"
-            size={15}
-            color={colors.textSecondary}
-            style={{ marginRight: 4 }}
-          />
-          <Text
-            style={[styles.cardSelfBadgeText, { color: colors.textSecondary }]}
-          >
-            Tu perfil
-          </Text>
-        </View>
-      ) : (
-        <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-          {/* Botón Contactar */} 
-          <TouchableOpacity
-            style={[
-              styles.cardContactBtn,
-              {
-                paddingHorizontal: 10,
-                paddingVertical: 8,
-                minWidth: 85,
-              },
-            ]}
-            onPress={(e: any) => {
-              e.stopPropagation?.();
-              setContactPro(item);
-            }}
-            activeOpacity={0.85}
-          >
-            <Ionicons
-              name="chatbubble-ellipses"
-              size={13}
-              color="#FFFFFF"
-              style={{ marginRight: 3 }}
-            />
-            <Text style={[styles.cardContactBtnText, { fontSize: 12 }]}>
-              Contactar
-            </Text>
-          </TouchableOpacity>
-
-          {/* Botón Solicitar*/}
-          <TouchableOpacity
-            style={[
-              styles.cardContactBtn,
-              {
-                backgroundColor: "#FFB74D",
-                borderWidth: 0,
-                paddingHorizontal: 10,
-                paddingVertical: 8,
-                minWidth: 85,
-              },
-            ]}
-            onPress={(e: any) => {
-              e.stopPropagation?.();
-
-              setSelectedPro(item);
-
-              getPublicServicesByProfessionalId(item._id).then((srvs) => {
-                setSelectedProServices(srvs);
-                setIsSolicitudModalVisible(true);
-              });
-            }}
-            activeOpacity={0.85}
-          >
-            <Ionicons
-              name="calendar-outline"
-              size={13}
-              color="#121826"
-              style={{ marginRight: 3 }}
-            />
+      {/* CONTENEDOR INFERIOR: Precio y botones alineados sin texto suelto */}
+      <View
+        style={[
+          styles.cardFooterRow,
+          {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+          },
+        ]}
+      >
+        {/* Bloque de Tarifa a la izquierda */}
+        <View>
+          {item.tarifaBase !== undefined ? (
             <Text
               style={[
-                styles.cardContactBtnText,
-                { color: "#121826", fontWeight: "bold", fontSize: 12 },
+                styles.tarifa,
+                { color: colors.text, fontSize: 14, fontWeight: "bold" },
               ]}
             >
-              Solicitar
+              ${item.tarifaBase}/hora
             </Text>
-          </TouchableOpacity>
+          ) : (
+            <Text
+              style={[
+                styles.tarifaConsultar,
+                { color: colors.textSecondary, fontSize: 12 },
+              ]}
+            >
+              A convenir
+            </Text>
+          )}
         </View>
-      )}
-    </View>
-  </TouchableOpacity>
-);
+
+        {item.usuario._id === usuario?.id || item._id === usuario?.id ? (
+          <View style={styles.cardSelfBadge}>
+            <Ionicons
+              name="person-circle-outline"
+              size={15}
+              color={colors.textSecondary}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={[styles.cardSelfBadgeText, { color: colors.textSecondary }]}
+            >
+              Tu perfil
+            </Text>
+          </View>
+        ) : (
+          <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+            {/* Botón Contactar */}
+            <TouchableOpacity
+              style={[
+                styles.cardContactBtn,
+                {
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                  minWidth: 85,
+                },
+              ]}
+              onPress={(e: any) => {
+                e.stopPropagation?.();
+                setContactPro(item);
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name="chatbubble-ellipses"
+                size={13}
+                color="#FFFFFF"
+                style={{ marginRight: 3 }}
+              />
+              <Text style={[styles.cardContactBtnText, { fontSize: 12 }]}>
+                Contactar
+              </Text>
+            </TouchableOpacity>
+
+            {/* Botón Solicitar*/}
+            <TouchableOpacity
+              style={[
+                styles.cardContactBtn,
+                {
+                  backgroundColor: "#FFB74D",
+                  borderWidth: 0,
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                  minWidth: 85,
+                },
+              ]}
+              onPress={(e: any) => {
+                e.stopPropagation?.();
+
+                setSelectedPro(item);
+
+                getPublicServicesByProfessionalId(item._id).then((srvs) => {
+                  setSelectedProServices(srvs);
+                  setIsSolicitudModalVisible(true);
+                });
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={13}
+                color="#121826"
+                style={{ marginRight: 3 }}
+              />
+              <Text
+                style={[
+                  styles.cardContactBtnText,
+                  { color: "#121826", fontWeight: "bold", fontSize: 12 },
+                ]}
+              >
+                Solicitar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -900,12 +913,12 @@ const renderProfesional = ({ item }: { item: Profesional }) => (
           profesionalId={selectedPro._id}
           onContact={
             selectedPro.usuario._id === usuario?.id ||
-            selectedPro._id === usuario?.id
+              selectedPro._id === usuario?.id
               ? undefined
               : () => {
-                  setShowProModal(false);
-                  setContactPro(selectedPro);
-                }
+                setShowProModal(false);
+                setContactPro(selectedPro);
+              }
           }
           nombre={selectedPro.usuario.nombre}
           apellido={selectedPro.usuario.apellido}
