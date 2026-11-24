@@ -18,11 +18,20 @@ export function createAudioPlayer(source: { uri: string }) {
   const player = AudioRecorderPlayer as any;
   let statusListener: ((status: any) => void) | null = null;
   let playing = false;
+  let currentPlaybackRate = 1.0;
 
   const wrapper = {
     loop: false,
     volume: 1.0,
-    playbackRate: 1.0,
+    get playbackRate() {
+      return currentPlaybackRate;
+    },
+    set playbackRate(rate: number) {
+      currentPlaybackRate = rate;
+      if (playing && typeof player.setPlaybackSpeed === 'function') {
+        player.setPlaybackSpeed(rate).catch(() => { });
+      }
+    },
     addListener: (event: string, cb: (status: any) => void) => {
       if (event === 'playbackStatusUpdate') {
         statusListener = cb;
@@ -37,6 +46,9 @@ export function createAudioPlayer(source: { uri: string }) {
       try {
         playing = true;
         await player.startPlayer(source.uri);
+        if (currentPlaybackRate !== 1.0 && typeof player.setPlaybackSpeed === 'function') {
+          await player.setPlaybackSpeed(currentPlaybackRate).catch(() => { });
+        }
         player.addPlayBackListener((e: any) => {
           statusListener?.({
             duration: e.duration,
@@ -48,7 +60,7 @@ export function createAudioPlayer(source: { uri: string }) {
           });
           if (e.currentPosition >= e.duration && e.duration > 0) {
             if (wrapper.loop) {
-              player.seekToPlayer(0).catch(() => {});
+              player.seekToPlayer(0).catch(() => { });
             } else {
               playing = false;
             }
@@ -64,14 +76,14 @@ export function createAudioPlayer(source: { uri: string }) {
       playing = false;
       try {
         await player.pausePlayer();
-      } catch {}
+      } catch { }
     },
     release: async () => {
       playing = false;
       try {
         await player.stopPlayer();
         player.removePlayBackListener();
-      } catch {}
+      } catch { }
     },
   };
 
@@ -82,7 +94,7 @@ export class NativeAudioRecorder {
   private recorder = AudioRecorderPlayer as any;
   public uri: string | null = null;
 
-  async prepareToRecordAsync() {}
+  async prepareToRecordAsync() { }
 
   async record() {
     this.uri = await this.recorder.startRecorder();

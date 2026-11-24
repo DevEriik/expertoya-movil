@@ -380,7 +380,11 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
 
       const filePart = await createFormDataFile(asset.uri, filename, mimeType);
       const formData = new FormData();
-      formData.append('foto', filePart, filename);
+      if (Platform.OS === 'web') {
+        formData.append('foto', filePart, filename);
+      } else {
+        formData.append('foto', filePart as any);
+      }
 
       const response = await apiClient(`/api/chat/${solicitudId}/adjunto`, {
         method: 'POST',
@@ -521,7 +525,11 @@ export const useChatSocket = ({ solicitudId, userId, token }: UseChatSocketParam
 
       const audioPart = await createFormDataFile(audioUriOrBlob, filename, mimeType);
       const formData = new FormData();
-      formData.append('audio', audioPart, filename);
+      if (Platform.OS === 'web') {
+        formData.append('audio', audioPart, filename);
+      } else {
+        formData.append('audio', audioPart as any);
+      }
 
       const response = await apiClient(`/api/chat/${solicitudId}/adjunto`, {
         method: 'POST',
