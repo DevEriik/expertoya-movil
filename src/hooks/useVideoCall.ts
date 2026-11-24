@@ -175,80 +175,84 @@ export function useVideoCall({
       return;
     }
 
-    if (Platform.OS === 'android') {
-      try {
-        PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.CAMERA,
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-        ]).then((statuses) => {
-          console.log('[useVideoCall] Permisos Android cámara y mic:', statuses);
-        }).catch((pErr) => {
-          console.warn('[useVideoCall] Error al solicitar permisos Android:', pErr);
-        });
-      } catch (err) {
-        console.warn('[useVideoCall] Error ejecutando PermissionsAndroid:', err);
+    let cancelled = false;
+
+    const initCall = async () => {
+      if (Platform.OS === 'android') {
+        try {
+          const statuses = await PermissionsAndroid.requestMultiple([
+            PermissionsAndroid.PERMISSIONS.CAMERA,
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          ]);
+          const camOk = statuses[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED;
+          const micOk = statuses[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
+          if (!camOk || !micOk) {
+            if (!cancelled) {
+              setErrorMessage('Se requieren permisos de cámara y micrófono para la videollamada.');
+              setCallState('error');
+            }
+            return;
+          }
+        } catch (err) {
+          console.warn('[useVideoCall] Error ejecutando PermissionsAndroid:', err);
+        }
       }
-    }
 
-    if (!Daily) {
-      console.warn('[useVideoCall] Ejecutando sin @daily-co/react-native-daily-js nativo. Se requiere Expo Dev Client.');
-      setCallState('connected');
-      return;
-    }
+      if (cancelled) return;
 
-    let call = typeof Daily.getCallInstance === 'function' ? Daily.getCallInstance() : null;
-
-    if (!call) {
-      try {
-        call = Daily.createCallObject({
-          dailyConfig: {
-            useDevicePreferenceStorage: false,
-          },
-        });
-      } catch (createErr) {
-        console.warn('[useVideoCall] Daily call object ya instanciado:', createErr);
-        call = Daily.getCallInstance();
+      if (!Daily) {
+        console.warn('[useVideoCall] @daily-co/react-native-daily-js no disponible.');
+        setCallState('connected');
+        return;
       }
-    }
 
-    callObjectRef.current = call;
+      let call = typeof Daily.getCallInstance === 'function' ? Daily.getCallInstance() : null;
 
-    if (call) {
-      // Evento: Unido a la sala
+      if (!call) {
+        try {
+          call = Daily.createCallObject({
+            dailyConfig: {
+              useDevicePreferenceStorage: false,
+            },
+          });
+        } catch (createErr) {
+          console.warn('[useVideoCall] Daily call object ya instanciado:', createErr);
+          call = Daily.getCallInstance();
+        }
+      }
+
+      if (cancelled || !call) return;
+      callObjectRef.current = call;
+
       call.on('joined-meeting', () => {
         setCallState('connected');
         setErrorMessage(null);
         syncParticipants(call);
       });
 
-      // Evento: Participante remoto se une
       call.on('participant-joined', (evt: any) => {
         setRemoteParticipant(evt.participant);
         syncParticipants(call);
       });
 
-      // Evento: Actualización de tracks o estado de participantes
-      call.on('participant-updated', (evt: any) => {
+      call.on('participant-updated', () => {
         syncParticipants(call);
       });
 
-      // Evento: Track de video o audio iniciado
       call.on('track-started', () => {
         syncParticipants(call);
       });
 
-      // Evento: Track detenido
       call.on('track-stopped', () => {
         syncParticipants(call);
       });
 
-      // Evento: Participante remoto sale
-      call.on('participant-left', (evt: any) => {
+      call.on('participant-left', () => {
         setRemoteParticipant(null);
         syncParticipants(call);
+        handleHangUp();
       });
 
-      // Evento: Estado de la conexión de red
       call.on('network-connection', (evt: any) => {
         if (evt?.event === 'interrupted') {
           setNetworkQuality('low');
@@ -267,15 +271,13 @@ export function useVideoCall({
         }
       });
 
-      // Evento: Salida de la reunión
       call.on('left-meeting', () => {
         if (isHangingUpRef.current) {
           cleanupCall();
-          if (onCallEnd) onCallEnd('left-meeting');
+          if (onCallEndRef.current) onCallEndRef.current('left-meeting');
         }
       });
 
-      // Evento: Error fatal en WebRTC o cámara
       call.on('error', (evt: any) => {
         console.error('[useVideoCall] Error en Daily:', evt);
         const rawMsg = evt?.errorMsg || evt?.error?.msg || '';
@@ -289,7 +291,6 @@ export function useVideoCall({
         }
         setErrorMessage(msg);
         setCallState('error');
-        return;
       });
 
       const joinOptions: any = {
@@ -302,9 +303,12 @@ export function useVideoCall({
         setErrorMessage('No se pudo establecer conexión con la sala de diagnóstico.');
         setCallState('error');
       });
-    }
+    };
+
+    void initCall();
 
     return () => {
+      cancelled = true;
       cleanupCall();
     };
   }, [roomUrl, token, userName, isChatActive, cleanupCall, syncParticipants, handleHangUp]);

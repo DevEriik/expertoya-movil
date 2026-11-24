@@ -1,5 +1,4 @@
-import { DeviceEventEmitter } from "react-native";
-import Config from "react-native-config";
+import { Platform, DeviceEventEmitter, NativeModules } from "react-native"; import Config from "react-native-config";
 import { getToken } from "./secureStore";
 
 const RENDER_BACKEND_URL = "https://expertoya-backend.onrender.com";
@@ -39,8 +38,6 @@ const getBaseApiUrl = (): string => {
       return `http://${hostIp}:3000`;
     }
   }
-  }
-
   return RENDER_BACKEND_URL;
 };
 

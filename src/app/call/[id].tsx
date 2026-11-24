@@ -39,6 +39,36 @@ const FONT_SANS_REGULAR = Platform.select({
   default: 'PlusJakartaSans-Regular',
 });
 
+const CallTimer = React.memo(({ isConnected }: { isConnected: boolean }) => {
+  const [seconds, setSeconds] = React.useState(0);
+
+  useEffect(() => {
+    if (!isConnected) {
+      setSeconds(0);
+      return;
+    }
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      setSeconds(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isConnected]);
+
+  if (!isConnected) return null;
+
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  const formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+  return (
+    <View style={styles.timerPill}>
+      <View style={styles.timerDot} />
+      <Text style={styles.timerText}>{formatted}</Text>
+    </View>
+  );
+});
+
 export default function CallScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -64,18 +94,22 @@ export default function CallScreen() {
 
   const decodedRoomUrl = roomUrl ? decodeURIComponent(roomUrl) : '';
 
-  const [callDuration, setCallDuration] = React.useState<number>(0);
-  const callDurationRef = useRef(0);
-  callDurationRef.current = callDuration;
+  const callStartTimeRef = useRef<number | null>(null);
+
+  const getElapsedSeconds = React.useCallback(() => {
+    return callStartTimeRef.current
+      ? Math.floor((Date.now() - callStartTimeRef.current) / 1000)
+      : 0;
+  }, []);
 
   const handleOnCallEnd = React.useCallback((reason?: string) => {
     if (socketRef.current?.connected && solicitudId) {
-      socketRef.current.emit('call:end', { solicitud_id: solicitudId, duracion: callDurationRef.current });
+      socketRef.current.emit('call:end', { solicitud_id: solicitudId, duracion: getElapsedSeconds() });
     }
     setTimeout(() => {
       router.back();
     }, 250);
-  }, [solicitudId, router]);
+  }, [solicitudId, router, getElapsedSeconds]);
 
   const {
     callState,
@@ -112,13 +146,16 @@ export default function CallScreen() {
       socket.emit('join_solicitud', { solicitud_id: solicitudId });
     });
 
-    socket.on('call:ended', (data: { solicitud_id: string; motivo?: string }) => {
+    socket.on('call:ended', (data: { solicitud_id: string; motivo?: string; finalizado_por?: string }) => {
       if (data.solicitud_id === solicitudId) {
-        Alert.alert(
-          'Llamada Finalizada',
-          data.motivo || 'El diagnóstico visual ha terminado.',
-          [{ text: 'OK', onPress: () => router.back() }]
-        );
+        void handleHangUp();
+        if (data.finalizado_por !== usuario?.id) {
+          Alert.alert(
+            'Llamada Finalizada',
+            data.motivo || 'La otra persona finalizó la videollamada.',
+            [{ text: 'OK', onPress: () => router.back() }]
+          );
+        }
       }
     });
 
@@ -128,26 +165,16 @@ export default function CallScreen() {
   }, [token, solicitudId, router]);
 
   useEffect(() => {
-    if (callState !== 'connected') {
-      return;
+    if (callState === 'connected' && !callStartTimeRef.current) {
+      callStartTimeRef.current = Date.now();
+    } else if (callState !== 'connected') {
+      callStartTimeRef.current = null;
     }
-    const startTime = Date.now() - callDuration * 1000;
-    const interval = setInterval(() => {
-      setCallDuration(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
-
-    return () => clearInterval(interval);
   }, [callState]);
-
-  const formatCallDuration = (totalSeconds: number) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const onHangUpPress = async () => {
     if (socketRef.current?.connected && solicitudId) {
-      socketRef.current.emit('call:end', { solicitud_id: solicitudId, duracion: callDuration });
+      socketRef.current.emit('call:end', { solicitud_id: solicitudId, duracion: getElapsedSeconds() });
     }
     await handleHangUp();
   };
@@ -241,12 +268,7 @@ export default function CallScreen() {
         </View>
 
         <View style={styles.headerRight}>
-          {callState === 'connected' && (
-            <View style={styles.timerPill}>
-              <View style={styles.timerDot} />
-              <Text style={styles.timerText}>{formatCallDuration(callDuration)}</Text>
-            </View>
-          )}
+          <CallTimer isConnected={callState === 'connected'} />
 
           <View style={styles.qualityPill}>
             <Text style={styles.qualityLabel}>Señal:</Text>
