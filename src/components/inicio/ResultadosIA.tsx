@@ -1,6 +1,7 @@
 import { useAccessibility } from "@/context/AccessibilityContext";
 import { useTheme } from "@/hooks/use-theme";
 import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
+import { useRouter } from "@/navigation/routerCompat";
 
 interface ResultadosIAProps {
   oficios: string[];
@@ -10,6 +11,7 @@ interface ResultadosIAProps {
 export function ResultadosIA({ oficios, isLoading }: ResultadosIAProps) {
   const colors = useTheme();
   const { isDarkMode } = useAccessibility();
+  const router = useRouter();
 
   if (isLoading) {
     return (
@@ -43,6 +45,13 @@ export function ResultadosIA({ oficios, isLoading }: ResultadosIAProps) {
         {oficios.map((oficio, index) => (
           <TouchableOpacity
             key={index}
+            activeOpacity={0.8}
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/search",
+                params: { oficio },
+              })
+            }
             style={{
               backgroundColor: colors.secondary,
               paddingVertical: 8,
