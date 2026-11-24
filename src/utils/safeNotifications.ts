@@ -49,7 +49,7 @@ export const setNotificationHandler = (_handler?: any) => {
 export const addNotificationResponseReceivedListener = (
   listener: (response: NotificationResponse) => void,
 ): Subscription => {
-  if (Platform.OS === 'web') return { remove: () => {} };
+  if (Platform.OS === 'web') return { remove: () => { } };
   const unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
     if (type === EventType.PRESS && detail.notification) {
       listener({
@@ -83,18 +83,52 @@ export const getLastNotificationResponseAsync = async (): Promise<NotificationRe
   }
 };
 
-export const clearLastNotificationResponseAsync = async () => {};
+export const clearLastNotificationResponseAsync = async () => { };
 
 export const addNotificationReceivedListener = (
-  _listener: (notification: any) => void,
+  listener: (notification: any) => void,
 ): Subscription => {
-  return { remove: () => {} };
+  if (Platform.OS === 'web') return { remove: () => { } };
+  try {
+    const { getMessaging, onMessage } = require('@react-native-firebase/messaging');
+    const unsubscribe = onMessage(getMessaging(), async (remoteMessage: any) => {
+      try {
+        const data = (remoteMessage?.data || {}) as Record<string, string>;
+        const title = remoteMessage?.notification?.title || data.title;
+        const body = remoteMessage?.notification?.body || data.body;
+
+        if (title || body) {
+          const isCritical = data.critica === 'true' || data.type === 'LLAMADA_ENTRANTE';
+          await notifee.displayNotification({
+            title: title || 'ExpertoYa',
+            body: body || '',
+            data,
+            android: {
+              channelId: isCritical ? 'critical' : 'default',
+              importance: isCritical
+                ? NotifeeImportance.HIGH
+                : NotifeeImportance.DEFAULT,
+              pressAction: { id: 'default' },
+            },
+          });
+        }
+      } catch (err) {
+        if (__DEV__) {
+          console.warn('Error mostrando notificación en primer plano:', err);
+        }
+      }
+      listener(remoteMessage);
+    });
+    return { remove: unsubscribe };
+  } catch {
+    return { remove: () => { } };
+  }
 };
 
 export const addPushTokenListener = (
   listener: (token: { data: string; type: string }) => void,
 ): Subscription => {
-  if (Platform.OS === 'web') return { remove: () => {} };
+  if (Platform.OS === 'web') return { remove: () => { } };
   try {
     const messaging = require('@react-native-firebase/messaging').default;
     const unsubscribe = messaging().onTokenRefresh((token: string) => {
@@ -102,7 +136,7 @@ export const addPushTokenListener = (
     });
     return { remove: unsubscribe };
   } catch {
-    return { remove: () => {} };
+    return { remove: () => { } };
   }
 };
 
