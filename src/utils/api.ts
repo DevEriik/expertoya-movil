@@ -76,8 +76,8 @@ export const apiClient = async (endpoint: string, options: ApiOptions = {}) => {
 
   const response = await fetch(`${API_URL}${endpoint}`, config);
 
-  if (response.status === 401 || response.status === 403) {
-    DeviceEventEmitter.emit("onUnauthorized");
+  if (response.status === 401) {
+    DeviceEventEmitter.emit('onUnauthorized');
   }
 
   return response;

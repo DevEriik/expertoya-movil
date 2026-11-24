@@ -40,22 +40,20 @@ const DEFAULT_SERVICES: ServicioPublicadoItem[] = [
 let inMemoryServices: ServicioPublicadoItem[] | null = null;
 
 export const getServices = async (): Promise<ServicioPublicadoItem[]> => {
-  // 1. Intentar obtener desde el backend API
   try {
     const res = await apiClient("/api/professionals/services");
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         inMemoryServices = data;
         await persistServices(data);
         return [...data];
       }
     }
   } catch {
-    // Si no hay sesión o backend en desarrollo, continuar con local
+    // Si falla la red, continuar con fallback local
   }
 
-  // 2. Fallback a almacenamiento local / memoria
   if (inMemoryServices) {
     return [...inMemoryServices];
   }
@@ -63,7 +61,7 @@ export const getServices = async (): Promise<ServicioPublicadoItem[]> => {
     const raw = await getToken(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         inMemoryServices = parsed;
         return [...inMemoryServices];
       }
@@ -72,9 +70,8 @@ export const getServices = async (): Promise<ServicioPublicadoItem[]> => {
     console.warn("Error leyendo servicios del almacenamiento local:", err);
   }
 
-  inMemoryServices = [...DEFAULT_SERVICES];
-  await persistServices(inMemoryServices);
-  return [...inMemoryServices];
+  inMemoryServices = [];
+  return [];
 };
 
 export const getPublicServicesByProfessionalId = async (
