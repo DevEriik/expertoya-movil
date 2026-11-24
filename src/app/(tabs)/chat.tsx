@@ -9,6 +9,7 @@ import { MessagesList } from '@/components/chat/MessagesList';
 import { ActiveConversation } from '@/components/chat/ActiveConversation';
 import { useAuth } from '@/context/AuthContext';
 import { apiClient } from '@/utils/api';
+import { getToken, saveToken } from '@/utils/secureStore';
 
 export default function ChatScreen() {
   const router = useRouter();
@@ -24,7 +25,32 @@ export default function ChatScreen() {
       : 'CLIENTE';
 
   const [chats, setChats] = useState<ChatSession[]>([]);
+  const [hiddenChatIds, setHiddenChatIds] = useState<string[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!usuario?.id) {
+      setHiddenChatIds([]);
+      return;
+    }
+    getToken(`hidden_chats_${usuario.id}`)
+      .then((raw) => {
+        if (!raw) return setHiddenChatIds([]);
+        const parsed = JSON.parse(raw);
+        setHiddenChatIds(Array.isArray(parsed) ? parsed : []);
+      })
+      .catch(() => setHiddenChatIds([]));
+  }, [usuario?.id]);
+
+  const handleDeleteChat = async (id: string) => {
+    const next = Array.from(new Set([...hiddenChatIds, id]));
+    setHiddenChatIds(next);
+    if (usuario?.id) {
+      await saveToken(`hidden_chats_${usuario.id}`, JSON.stringify(next)).catch(() => {});
+    }
+  };
+
+  const visibleChats = chats.filter((c) => !hiddenChatIds.includes(c.id));
 
   const fetchConversaciones = () => {
     if (!token) {
@@ -136,8 +162,9 @@ export default function ChatScreen() {
         />
       ) : (
         <MessagesList
-          chats={chats}
+          chats={visibleChats}
           onSelectChat={(id) => setActiveChatId(id)}
+          onDeleteChat={handleDeleteChat}
           activeRole={activeRole}
           colors={colors}
           isDark={isDark}
